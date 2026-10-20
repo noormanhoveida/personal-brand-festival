@@ -42,3 +42,6 @@ export function attachUserIfPresent(
   }
   next();
 }
+
+// Aliased export for compatibility with newer modules
+export const authenticate = requireAuth;
