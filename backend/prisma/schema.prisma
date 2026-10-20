@@ -948,3 +948,65 @@ model ArtifactComment {
   @@index([artifactId])
   @@index([parentId])
 }
+
+// ==========================================
+// ANNOUNCEMENTS & TICKETS MODULE
+// ==========================================
+
+enum AnnouncementType {
+  INFO
+  WARNING
+  SUCCESS
+  URGENT
+}
+
+model Announcement {
+  id        String             @id @default(uuid())
+  title     String
+  content   String             @db.Text
+  type      AnnouncementType   @default(INFO)
+  isGlobal  Boolean            @default(true) // آیا برای همه است یا کاربر خاص؟
+  targetUserId String?         // اگر خالی نباشد، فقط برای این کاربر خاص است
+  isSent    Boolean            @default(false) // آیا ایمیلش ارسال شده؟
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+
+  @@index([targetUserId])
+}
+
+enum TicketStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+}
+
+enum SenderRole {
+  USER
+  ADMIN
+}
+
+model Ticket {
+  id        String          @id @default(uuid())
+  userId    String
+  user      User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subject   String
+  status    TicketStatus    @default(OPEN)
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+  messages  TicketMessage[]
+
+  @@index([userId])
+}
+
+model TicketMessage {
+  id        String     @id @default(uuid())
+  ticketId  String
+  ticket    Ticket     @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  senderId  String     // شناسه کاربری که پیام را فرستاده (چه کاربر و چه ادمین)
+  senderRole SenderRole @default(USER)
+  message   String     @db.Text
+  createdAt DateTime   @default(now())
+
+  @@index([ticketId])
+}
