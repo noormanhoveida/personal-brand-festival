@@ -31,6 +31,7 @@ import challengeRoutes from "./modules/challenge/challenge.routes";
 import formRoutes from "./modules/form/form.routes";
 import networkGraphRoutes from "./modules/network-graph/network-graph.routes";
 import ticketRoutes from "./modules/tickets/ticket.routes";
+import announcementRoutes from "./modules/announcements/announcement.routes";
 import { authenticate } from "./middleware/auth.middleware";
 import { uploadDirAbsolutePath } from "./config/upload";
 
@@ -94,6 +95,7 @@ app.use(challengeRoutes);
 // app.use("/landing", landingRoutes);
 // app.use("/api/landing", landingRoutes);
 app.use("/tickets", authenticate, ticketRoutes);
+app.use("/announcements", announcementRoutes);
 app.use(errorHandler);
 
 
