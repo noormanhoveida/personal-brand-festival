@@ -77,6 +77,7 @@ enum EndorsementVote {
 // ----------------------------------------------------------
 
 model User {
+  tickets   Ticket[]
   bootcampAccesses   BootcampAccess[]
   artifactRatings    ArtifactRating[]
   artifactComments   ArtifactComment[]
