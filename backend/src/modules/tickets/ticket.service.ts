@@ -39,7 +39,7 @@ export class TicketService {
           from: process.env.SMTP_FROM || 'noreply@pbfestival.ir',
           to: process.env.ADMIN_EMAIL,
           subject: `تیکت جدید: ${subject}`,
-          text: `کاربر گرامی ${ticket.user.name || ticket.user.email} تیکت جدیدی ثبت کرد:\n\n${message}`,
+          text: `کاربر گرامی ${ticket.user.email || "کاربر سایت"} تیکت جدیدی ثبت کرد:\n\n${message}`,
         });
       }
     } catch (err) {

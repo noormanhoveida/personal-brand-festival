@@ -2,14 +2,6 @@ import { Request, Response } from "express";
 import { AnnouncementService } from "./announcement.service";
 import { AnnouncementType } from "@prisma/client";
 
-type AuthedRequest = Request & {
-  user?: {
-    id: string;
-    role?: string;
-    isAdmin?: boolean;
-  };
-};
-
 const service = new AnnouncementService();
 
 export class AnnouncementController {
@@ -22,9 +14,9 @@ export class AnnouncementController {
     }
   }
 
-  async create(req: AuthedRequest, res: Response) {
+  async create(req: Request, res: Response) {
     try {
-      const isAdmin = Boolean(req.user?.isAdmin || req.user?.role === "ADMIN");
+      const isAdmin = Boolean(req.user?.role === "ADMIN");
       if (!isAdmin) return res.status(403).json({ message: "Forbidden: Admins only" });
 
       const { title, content, type } = req.body || {};
@@ -44,9 +36,9 @@ export class AnnouncementController {
     }
   }
 
-  async remove(req: AuthedRequest, res: Response) {
+  async remove(req: Request, res: Response) {
     try {
-      const isAdmin = Boolean(req.user?.isAdmin || req.user?.role === "ADMIN");
+      const isAdmin = Boolean(req.user?.role === "ADMIN");
       if (!isAdmin) return res.status(403).json({ message: "Forbidden: Admins only" });
 
       const id = String(req.params.id || "");
