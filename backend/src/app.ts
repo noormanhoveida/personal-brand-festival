@@ -30,6 +30,8 @@ import leaderboardRoutes from "./modules/leaderboard/leaderboard.routes";
 import challengeRoutes from "./modules/challenge/challenge.routes";
 import formRoutes from "./modules/form/form.routes";
 import networkGraphRoutes from "./modules/network-graph/network-graph.routes";
+import ticketRoutes from "./modules/tickets/ticket.routes";
+import { authenticate } from "./middleware/auth.middleware";
 import { uploadDirAbsolutePath } from "./config/upload";
 
 const app = express();
@@ -91,6 +93,7 @@ app.use(challengeRoutes);
 
 // app.use("/landing", landingRoutes);
 // app.use("/api/landing", landingRoutes);
+app.use("/tickets", authenticate, ticketRoutes);
 app.use(errorHandler);
 
 
