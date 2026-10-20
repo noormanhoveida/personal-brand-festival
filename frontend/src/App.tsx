@@ -1,3 +1,5 @@
+import { AnnouncementsPage } from "./pages/AnnouncementsPage";
+import { TicketsPage } from "./pages/TicketsPage";
 import { MyArtifacts } from "./components/MyArtifacts";
 import NetworkPage from "./pages/NetworkPage";
 import { ForgotPasswordPage } from "./pages/ForgotPasswordPage";
@@ -91,7 +93,9 @@ export function App() {
             <Route path="challenges" element={<ChallengesPage />} />
                         <Route path="artifacts" element={<MyArtifacts />} />
             <Route path="settings" element={<SettingsPage />} />
-          </Route>
+                      <Route path="tickets" element={<TicketsPage />} />
+            <Route path="announcements" element={<AnnouncementsPage />} />
+</Route>
         </Route>
 
         <Route element={<RequireAuth allow={["BOOTCAMP_MANAGER", "ADMIN"]} />}>
