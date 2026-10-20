@@ -1,0 +1,88 @@
+import express from "express";
+import cors from "cors";
+import cookieParser from "cookie-parser";
+import { env } from "./config/env";
+import { errorHandler } from "./middleware/errorHandler";
+import authRoutes from "./modules/auth/auth.routes";
+import adminRoutes from "./modules/admin/admin.routes";
+import profileRoutes from "./modules/profile/profile.routes";
+import regionsRoutes from "./modules/regions/regions.routes";
+import journeyRoutes from "./modules/journey/journey.routes";
+import bootcampRoutes from "./modules/bootcamp/bootcamp.routes";
+import responseRoutes from "./modules/response/response.routes";
+import feedbackRoutes from "./modules/feedback/feedback.routes";
+import evaluationRoutes from "./modules/evaluation/evaluation.routes";
+import personalPageRoutes from "./modules/personal-page/personal-page.routes";
+import publicPageRoutes from "./modules/personal-page/public.routes";
+import analyticsRoutes from "./modules/analytics/analytics.routes";
+import showcaseRoutes from "./modules/showcase/showcase.routes";
+import mediaRoutes from "./modules/media/media.routes";
+import taskRoutes from "./modules/task/task.routes";
+import skillRoutes from "./modules/skill/skill.routes";
+import situationRoutes from "./modules/situation/situation.routes";
+import traitRoutes from "./modules/trait/trait.routes";
+import approvalRoutes from "./modules/approval/approval.routes";
+import liveSessionRoutes from "./modules/live-session/live-session.routes";
+import preAssessmentRoutes from "./modules/pre-assessment/pre-assessment.routes";
+import leaderboardRoutes from "./modules/leaderboard/leaderboard.routes";
+import challengeRoutes from "./modules/challenge/challenge.routes";
+import formRoutes from "./modules/form/form.routes";
+import { uploadDirAbsolutePath } from "./config/upload";
+
+const app = express();
+
+app.use(
+  cors({
+    origin: [
+      env.frontendUrl, // http://185.231.112.9
+      "http://bare-danesh.ir",
+      "https://bare-danesh.ir",
+      "http://www.bare-danesh.ir",
+      "https://www.bare-danesh.ir",
+      "http://pbfestival.ir",
+      "https://pbfestival.ir",
+      "http://www.pbfestival.ir",
+      "https://www.pbfestival.ir",
+    ],
+    credentials: true,
+  })
+);
+
+app.use(express.json());
+app.use(cookieParser());
+
+// Serves files saved by the local storage driver (spec §38) at the
+// same /uploads/<filename> URL saveUploadedMedia() generates.
+app.use("/uploads", express.static(uploadDirAbsolutePath));
+
+app.get("/health", (_req, res) => res.json({ status: "ok" }));
+
+app.use("/auth", authRoutes);
+app.use("/admin", adminRoutes);
+app.use("/profile", profileRoutes);
+app.use("/regions", regionsRoutes);
+app.use("/journey", journeyRoutes);
+app.use("/bootcamps", bootcampRoutes);
+app.use("/responses", responseRoutes);
+app.use("/feedback", feedbackRoutes);
+app.use("/evaluations", evaluationRoutes);
+app.use("/personal-page", personalPageRoutes);
+app.use("/public", publicPageRoutes);
+app.use("/analytics", analyticsRoutes);
+app.use("/showcase", showcaseRoutes);
+app.use("/media", mediaRoutes);
+app.use("/skills", skillRoutes);
+app.use("/situations", situationRoutes);
+app.use("/traits", traitRoutes);
+app.use("/forms", formRoutes);
+app.use("/approval", approvalRoutes);
+
+app.use(taskRoutes);
+app.use(liveSessionRoutes);
+app.use(preAssessmentRoutes);
+app.use(leaderboardRoutes);
+app.use(challengeRoutes);
+
+app.use(errorHandler);
+
+export default app;

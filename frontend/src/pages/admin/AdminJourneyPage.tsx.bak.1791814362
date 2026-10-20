@@ -1,0 +1,349 @@
+import { useEffect, useMemo, useState } from "react";
+import {
+  JourneySection,
+  JourneySectionDetail,
+  createJourneySection,
+  deleteJourneySection,
+  getJourneySection,
+  listJourneySections,
+  updateJourneySection,
+} from "../../api/journey";
+import { attachQuestionToSection } from "../../api/journey";
+import { QuestionBankPicker } from "../../components/QuestionBankPicker";
+import { Button, Card, ErrorText, Input, Label, Spinner, Textarea } from "../../components/ui";
+
+type EditState = {
+  id: string;
+  title: string;
+  description: string;
+  order: number;
+};
+
+export function AdminJourneyPage() {
+  const [sections, setSections] = useState<JourneySection[]>([]);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  const selected = useMemo(
+    () => sections.find((s) => s.id === selectedId) || null,
+    [sections, selectedId]
+  );
+
+  async function reload() {
+    setLoadError(null);
+    try {
+      const list = await listJourneySections();
+      setSections(list);
+      if (!selectedId && list.length) setSelectedId(list[0].id);
+    } catch (e: any) {
+      setLoadError(e?.response?.data?.message || "خطا در دریافت لیست گام‌ها");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    reload();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  return (
+    <div className="p-6 space-y-4">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-xl font-bold">مدیریت گام‌های مسیر برند</h1>
+          <p className="text-sm opacity-70">
+            حذف امن: اگر گام وابستگی داشته باشد، با <code>force</code> اتصال‌ها قطع می‌شود و سپس گام حذف می‌گردد.
+          </p>
+        </div>
+      </div>
+
+      {loading ? (
+        <div className="flex items-center gap-2 text-sm opacity-70">
+          <Spinner /> در حال بارگذاری...
+        </div>
+      ) : loadError ? (
+        <ErrorText>{loadError}</ErrorText>
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          <SectionsPanel
+            sections={sections}
+            selectedId={selectedId}
+            onSelect={setSelectedId}
+            onChanged={reload}
+          />
+          <div className="lg:col-span-2">
+            {selected ? (
+              <SectionPanel sectionId={selected.id} onChanged={reload} />
+            ) : (
+              <Card className="p-6 text-sm opacity-70">یک گام را انتخاب کنید.</Card>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SectionsPanel({
+  sections,
+  selectedId,
+  onSelect,
+  onChanged,
+}: {
+  sections: JourneySection[];
+  selectedId: string | null;
+  onSelect: (id: string) => void;
+  onChanged: () => void;
+}) {
+  const [error, setError] = useState<string | null>(null);
+  const [adding, setAdding] = useState(false);
+
+  const [key, setKey] = useState("");
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+
+  const [editing, setEditing] = useState<EditState | null>(null);
+
+  async function onCreate() {
+    setError(null);
+    try {
+      await createJourneySection({
+        key: key.trim(),
+        title: title.trim(),
+        description: description.trim() || undefined,
+      });
+      setKey("");
+      setTitle("");
+      setDescription("");
+      setAdding(false);
+      onChanged();
+    } catch (e: any) {
+      setError(e?.response?.data?.message || "خطا در ساخت گام");
+    }
+  }
+
+  async function onSaveEdit() {
+    if (!editing) return;
+    setError(null);
+    try {
+      await updateJourneySection(editing.id, {
+        title: editing.title.trim(),
+        description: editing.description.trim() || undefined,
+        order: editing.order,
+      });
+      setEditing(null);
+      onChanged();
+    } catch (e: any) {
+      setError(e?.response?.data?.message || "خطا در ذخیره تغییرات");
+    }
+  }
+
+  async function onDelete(section: JourneySection) {
+    setError(null);
+    if (!confirm(`حذف گام «${section.title}»؟`)) return;
+
+    try {
+      await deleteJourneySection(section.id, false);
+      onChanged();
+    } catch (e: any) {
+      const status = e?.response?.status;
+      const msg = e?.response?.data?.message || "این گام قابل حذف نیست.";
+      if (status === 409) {
+        const ok = confirm(
+          `هشدار: ${msg}\n\nاگر ادامه دهید، اتصال سوال/بوت‌کمپ‌ها از این گام قطع می‌شود (داده‌های کاربران حذف نمی‌شوند).\nادامه می‌دهید؟`
+        );
+        if (!ok) return;
+
+        try {
+          await deleteJourneySection(section.id, true);
+          onChanged();
+        } catch (e2: any) {
+          setError(e2?.response?.data?.message || "خطا در حذف اجباری");
+        }
+      } else {
+        setError(msg);
+      }
+    }
+  }
+
+  return (
+    <Card className="p-4 space-y-3">
+      <div className="flex items-center justify-between">
+        <div className="font-bold">فهرست گام‌ها</div>
+        <Button size="sm" onClick={() => setAdding((v) => !v)} variant={adding ? "secondary" : "primary"}>
+          {adding ? "بستن" : "گام جدید"}
+        </Button>
+      </div>
+
+      {error && <ErrorText>{error}</ErrorText>}
+
+      {adding && (
+        <Card className="p-3 space-y-2">
+          <div className="grid gap-2">
+            <Label>Key</Label>
+            <Input value={key} onChange={(e) => setKey(e.target.value)} placeholder="مثلا identity" />
+          </div>
+          <div className="grid gap-2">
+            <Label>عنوان</Label>
+            <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="عنوان گام" />
+          </div>
+          <div className="grid gap-2">
+            <Label>توضیحات</Label>
+            <Textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={2} />
+          </div>
+          <Button onClick={onCreate} disabled={!key.trim() || !title.trim()}>
+            ثبت
+          </Button>
+        </Card>
+      )}
+
+      <div className="space-y-2">
+        {sections.map((s) => {
+          const active = s.id === selectedId;
+          const isEditing = editing?.id === s.id;
+
+          return (
+            <div
+              key={s.id}
+              className={`rounded border p-3 cursor-pointer ${active ? "border-primary" : "border-border"}`}
+              onClick={() => onSelect(s.id)}
+            >
+              {!isEditing ? (
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="text-xs opacity-60">#{s.order} • {s.key}</div>
+                    <div className="font-bold truncate">{s.title}</div>
+                    {s.description ? <div className="text-xs opacity-70 line-clamp-2">{s.description}</div> : null}
+                  </div>
+                  <div className="flex gap-2 shrink-0" onClick={(e) => e.stopPropagation()}>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() =>
+                        setEditing({
+                          id: s.id,
+                          title: s.title,
+                          description: s.description || "",
+                          order: s.order,
+                        })
+                      }
+                    >
+                      ویرایش
+                    </Button>
+                    <Button size="sm" variant="destructive" onClick={() => onDelete(s)}>
+                      حذف
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-2" onClick={(e) => e.stopPropagation()}>
+                  <div className="grid gap-2">
+                    <Label>عنوان</Label>
+                    <Input
+                      value={editing.title}
+                      onChange={(e) => setEditing({ ...editing, title: e.target.value })}
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label>توضیحات</Label>
+                    <Textarea
+                      rows={2}
+                      value={editing.description}
+                      onChange={(e) => setEditing({ ...editing, description: e.target.value })}
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label>ترتیب</Label>
+                    <Input
+                      type="number"
+                      value={editing.order}
+                      onChange={(e) => setEditing({ ...editing, order: Number(e.target.value) })}
+                    />
+                  </div>
+                  <div className="flex gap-2">
+                    <Button size="sm" onClick={onSaveEdit}>ذخیره</Button>
+                    <Button size="sm" variant="ghost" onClick={() => setEditing(null)}>لغو</Button>
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </Card>
+  );
+}
+
+function SectionPanel({ sectionId, onChanged }: { sectionId: string; onChanged: () => void }) {
+  const [detail, setDetail] = useState<JourneySectionDetail | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  async function load() {
+    setError(null);
+    setLoading(true);
+    try {
+      const d = await getJourneySection(sectionId);
+      setDetail(d);
+    } catch (e: any) {
+      setError(e?.response?.data?.message || "خطا در دریافت جزئیات گام");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sectionId]);
+
+  if (loading) return <div className="p-4"><Spinner /></div>;
+  if (error) return <ErrorText>{error}</ErrorText>;
+  if (!detail) return null;
+
+  return (
+    <div className="space-y-4">
+      <Card className="p-4 space-y-1">
+        <div className="font-bold text-lg">{detail.title}</div>
+        <div className="text-sm opacity-70">{detail.description || "بدون توضیح"}</div>
+        <div className="text-xs opacity-70 pt-2">
+          سوالات: {detail.questions?.length || 0} • بوت‌کمپ‌ها: {detail.bootcamps?.length || 0}
+        </div>
+      </Card>
+
+      <Card className="p-4 space-y-3">
+        <div className="font-bold">سوالات متصل به این گام</div>
+
+        <div className="space-y-2">
+          {detail.questions?.map((q) => (
+            <div key={q.id} className="rounded border border-border p-3 flex items-start justify-between gap-3">
+              <div className="text-sm">{q.text}</div>
+              <Button
+                size="sm"
+                variant="ghost"
+                type="button"
+                title="قطع اتصال هنوز در API این بخش پیاده‌سازی نشده است"
+                onClick={() => window.alert("قطع اتصال سوال از گام هنوز در API این بخش پیاده‌سازی نشده است.")}
+              >
+                قطع اتصال
+              </Button>
+            </div>
+          ))}
+
+          {!detail.questions?.length ? (
+            <div className="text-sm opacity-70">سوالی وصل نیست.</div>
+          ) : null}
+        </div>
+
+        <QuestionBankPicker onAttach={async (questionId: string) => {
+            await attachQuestionToSection(detail.id, questionId);
+            await load();
+            onChanged();
+          }}
+        />
+      </Card>
+    </div>
+  );
+}

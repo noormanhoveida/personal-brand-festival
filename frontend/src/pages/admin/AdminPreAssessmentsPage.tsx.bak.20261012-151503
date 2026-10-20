@@ -1,0 +1,64 @@
+import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
+import { listAllPreAssessments, PreAssessmentListEntry } from "../../api/preAssessment";
+import { Card, LoadError, Spinner } from "../../components/ui";
+
+export function AdminPreAssessmentsPage() {
+  const [entries, setEntries] = useState<PreAssessmentListEntry[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const load = () => {
+    setError(null);
+    listAllPreAssessments()
+      .then(setEntries)
+      .catch(() => setError("بارگذاری لیست پیش‌ارزیابی‌ها با خطا مواجه شد."));
+  };
+
+  useEffect(load, []);
+
+  if (error) return <LoadError message={error} onRetry={load} />;
+  if (!entries) {
+    return (
+      <div className="flex justify-center py-16">
+        <Spinner />
+      </div>
+    );
+  }
+
+  const completedCount = entries.filter((e) => e.completed).length;
+
+  return (
+    <div className="mx-auto max-w-2xl">
+      <h1 className="text-2xl font-bold">پیش‌ارزیابی برند شخصی</h1>
+      <p className="mt-1 text-sm opacity-70">
+        {completedCount} از {entries.length} شرکت‌کننده فرم پیش‌ارزیابی را تکمیل کرده‌اند.
+      </p>
+
+      <Card className="mt-4">
+        <div className="space-y-1">
+          {entries.map((e) => (
+            <div
+              key={e.participantId}
+              className="flex items-center justify-between rounded-lg px-3 py-2 text-sm"
+              style={{ backgroundColor: "var(--surface)" }}
+            >
+              <span>{e.firstName} {e.lastName}</span>
+              {e.completed ? (
+                <Link
+                  to={`/dashboard/evaluator/${e.participantId}/pre-assessment`}
+                  className="text-xs"
+                  style={{ color: "var(--accent)" }}
+                >
+                  تکمیل‌شده — مشاهده ←
+                </Link>
+              ) : (
+                <span className="text-xs opacity-50">هنوز تکمیل نشده</span>
+              )}
+            </div>
+          ))}
+          {entries.length === 0 && <p className="text-xs opacity-60">هنوز شرکت‌کننده‌ای ثبت‌نام نکرده.</p>}
+        </div>
+      </Card>
+    </div>
+  );
+}

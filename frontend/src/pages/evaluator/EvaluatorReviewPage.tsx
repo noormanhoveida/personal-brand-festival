@@ -1,0 +1,201 @@
+import { FormattedContent } from "../../components/FormattedContent";
+import { useEffect, useState } from "react";
+import { useParams, Link } from "react-router-dom";
+import {
+  ReviewBundle,
+  getReviewBundle,
+  openEvaluation,
+  saveDraft,
+  submitEvaluation,
+} from "../../api/evaluation";
+import { Button, Card, Spinner, Textarea } from "../../components/ui";
+
+export function EvaluatorReviewPage() {
+  const { participantId } = useParams<{ participantId: string }>();
+  const [bundle, setBundle] = useState<ReviewBundle | null>(null);
+  const [evaluationId, setEvaluationId] = useState<string | null>(null);
+  const [scores, setScores] = useState<Record<string, number>>({});
+  const [comment, setComment] = useState("");
+  const [transformationScore, setTransformationScore] = useState<number | "">("");
+  const [saving, setSaving] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
+
+  const load = () => {
+    if (!participantId) return;
+    getReviewBundle(participantId).then((b) => {
+      setBundle(b);
+      if (b.ownEvaluation) {
+        setEvaluationId(b.ownEvaluation.id);
+        setComment(b.ownEvaluation.comment ?? "");
+        setTransformationScore(b.ownEvaluation.transformationScore ?? "");
+        setSubmitted(b.ownEvaluation.status === "SUBMITTED");
+        const initialScores: Record<string, number> = {};
+        b.ownEvaluation.scores.forEach((s) => {
+          initialScores[s.criterionId] = s.score;
+        });
+        setScores(initialScores);
+      }
+    });
+  };
+
+  useEffect(load, [participantId]);
+
+  const ensureEvaluation = async () => {
+    if (evaluationId || !participantId) return evaluationId;
+    const evaluation = await openEvaluation(participantId);
+    setEvaluationId(evaluation.id);
+    return evaluation.id;
+  };
+
+  const handleSaveDraft = async () => {
+    if (!bundle) return;
+    setSaving(true);
+    try {
+      const id = evaluationId ?? (await ensureEvaluation());
+      if (!id) return;
+      await saveDraft(id, {
+        scores: bundle.criteria
+          .filter((c) => scores[c.id] !== undefined)
+          .map((c) => ({ criterionId: c.id, score: scores[c.id] })),
+        comment: comment || undefined,
+        transformationScore: transformationScore === "" ? undefined : transformationScore,
+      });
+      load();
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleSubmit = async () => {
+    setSaving(true);
+    try {
+      await handleSaveDraft();
+      const id = evaluationId;
+      if (id) {
+        await submitEvaluation(id);
+        setSubmitted(true);
+      }
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (!bundle) {
+    return (
+      <div className="flex justify-center py-16">
+        <Spinner />
+      </div>
+    );
+  }
+
+  return (
+    <div className="mx-auto max-w-3xl">
+      <Link to="/dashboard/evaluator" className="text-sm opacity-70">
+        ← بازگشت به لیست
+      </Link>
+      <h1 className="mt-2 text-2xl font-bold">
+        {bundle.participant.firstName} {bundle.participant.lastName}
+      </h1>
+      <p className="mt-1 text-sm opacity-60">
+        {bundle.participant.city} {bundle.participant.region && `· ${bundle.participant.region.name}`}
+      </p>
+      <Link
+        to={`/dashboard/evaluator/${participantId}/pre-assessment`}
+        className="mt-1 inline-block text-xs"
+        style={{ color: "var(--accent)" }}
+      >
+        مشاهده‌ی پیش‌ارزیابی اولیه ←
+      </Link>
+      {bundle.participant.bio && <p className="mt-3 text-sm opacity-80">{bundle.participant.bio}</p>}
+
+      {/* Response history — before/after */}
+      <h2 className="mt-8 text-lg font-semibold">تاریخچه پاسخ‌ها</h2>
+      <div className="mt-3 space-y-3">
+        {bundle.responses.map((r) => (
+          <Card key={r.id}>
+            <div className="text-sm font-medium"><FormattedContent content={r.question.text} /></div>
+            <div className="mt-2 space-y-2">
+              {r.versions.map((v) => (
+                <div key={v.versionNumber} className="rounded-lg p-2 text-sm" style={{ backgroundColor: "var(--surface)" }}>
+                  <span className="text-xs opacity-60">نسخه {v.versionNumber} ({v.stage}): </span>
+                  {v.content}
+                </div>
+              ))}
+            </div>
+          </Card>
+        ))}
+        {bundle.responses.length === 0 && <p className="text-sm opacity-60">پاسخی ثبت نشده است.</p>}
+      </div>
+
+      {/* Feedback */}
+      <h2 className="mt-8 text-lg font-semibold">بازخوردهای دریافتی</h2>
+      <div className="mt-3 space-y-2">
+        {bundle.feedback.map((f, i) => (
+          <Card key={i} className="text-sm">
+            <span className="opacity-60">{f.authorName ?? "ناشناس"}: </span>
+            {f.answers.q1}
+          </Card>
+        ))}
+        {bundle.feedback.length === 0 && <p className="text-sm opacity-60">بازخوردی دریافت نکرده است.</p>}
+      </div>
+
+      {/* Scoring rubric */}
+      <h2 className="mt-8 text-lg font-semibold">ارزیابی</h2>
+      <Card className="mt-3 space-y-4">
+        {bundle.criteria.map((c) => (
+          <div key={c.id}>
+            <div className="flex items-center justify-between text-sm">
+              <span>{c.title} <span className="opacity-50">({Math.round(c.weight * 100)}٪)</span></span>
+              <span className="font-semibold" style={{ color: "var(--accent)" }}>
+                {scores[c.id] ?? "—"}
+              </span>
+            </div>
+            <input
+              type="range"
+              min={0}
+              max={100}
+              value={scores[c.id] ?? 0}
+              disabled={submitted}
+              onChange={(e) => setScores((s) => ({ ...s, [c.id]: Number(e.target.value) }))}
+              className="mt-1 w-full"
+            />
+          </div>
+        ))}
+
+        <div>
+          <label className="mb-1 block text-xs opacity-70">امتیاز تحول (۰ تا ۱۰۰)</label>
+          <input
+            type="number"
+            min={0}
+            max={100}
+            disabled={submitted}
+            value={transformationScore}
+            onChange={(e) => setTransformationScore(e.target.value === "" ? "" : Number(e.target.value))}
+            className="w-32 rounded-lg border px-3 py-2 text-sm"
+            style={{ backgroundColor: "var(--surface)", borderColor: "var(--surface)", color: "var(--text)" }}
+          />
+        </div>
+
+        <div>
+          <label className="mb-1 block text-xs opacity-70">یادداشت ارزیاب</label>
+          <Textarea rows={3} disabled={submitted} value={comment} onChange={(e) => setComment(e.target.value)} />
+        </div>
+
+        {submitted ? (
+          <p className="text-sm" style={{ color: "var(--accent)" }}>
+            این ارزیابی نهایی شده است.
+          </p>
+        ) : (
+          <div className="flex gap-3">
+            <Button variant="ghost" onClick={handleSaveDraft} disabled={saving}>
+              ذخیره پیش‌نویس
+            </Button>
+            <Button onClick={handleSubmit} disabled={saving}>
+              ثبت نهایی
+            </Button>
+          </div>
+        )}
+      </Card>
+    </div>
+  );
+}

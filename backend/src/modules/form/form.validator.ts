@@ -1,0 +1,62 @@
+import { z } from "zod";
+
+export const createFormSchema = z.object({
+  type: z.enum(["EVALUATION", "PRE_ASSESSMENT"]).default("EVALUATION"),
+  bootcampId: z.string().optional().nullable(),
+  title: z.string().min(2, "عنوان فرم الزامی است"),
+  description: z.string().optional(),
+  slug: z.string().optional(),
+  startsAt: z.string().datetime().optional().nullable(),
+  endsAt: z.string().datetime().optional().nullable(),
+  themeConfig: z.record(z.any()).optional().nullable(),
+});
+
+export const updateFormSchema = createFormSchema.partial().extend({
+  isActive: z.boolean().optional(),
+  status: z.enum(["DRAFT", "ACTIVE", "ARCHIVED"]).optional(),
+});
+
+export const addQuestionSchema = z.object({
+  label: z.string().min(1, "متن سؤال الزامی است"),
+  helpText: z.string().optional().nullable(),
+  inputType: z.enum([
+    "TEXT",
+    "TEXTAREA",
+    "SELECT",
+    "MULTI_SELECT",
+    "RADIO",
+    "CHECKBOX",
+    "NUMBER",
+    "DATE",
+    "RATING",
+    "FILE_UPLOAD",
+    "LIKERT"
+  ]).default("TEXT"),
+  options: z.array(z.string()).default([]),
+  isRequired: z.boolean().default(true),
+  weight: z.number().optional().nullable(),
+  order: z.number().int().optional(),
+  config: z.record(z.any()).optional().nullable(),
+});
+
+export const updateQuestionSchema = addQuestionSchema.partial();
+
+export const reorderQuestionsSchema = z.object({
+  orders: z.array(
+    z.object({
+      id: z.string(),
+      order: z.number().int(),
+    })
+  ),
+});
+
+export const submitAnswerSchema = z.object({
+  guestEmail: z.string().email("ایمیل نامعتبر است").optional().nullable(),
+  guestName: z.string().optional().nullable(),
+  items: z.array(
+    z.object({
+      questionId: z.string(),
+      value: z.any(),
+    })
+  ).min(1, "پاسخی ارسال نشده است"),
+});

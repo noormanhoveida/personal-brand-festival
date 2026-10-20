@@ -1,0 +1,51 @@
+import { useNavigate } from "react-router-dom";
+import { logout } from "../api/auth";
+import { useAppDispatch, useAppSelector } from "../hooks/redux";
+import { clearSession } from "../features/auth/authSlice";
+import { ThemeSwitcher } from "../features/theme/ThemeSwitcher";
+import { Button, Card } from "../components/ui";
+
+const ROLE_LABEL: Record<string, string> = {
+  VISITOR: "بازدیدکننده",
+  PARTICIPANT: "شرکت‌کننده",
+  EVALUATOR: "ارزیاب",
+  BOOTCAMP_MANAGER: "مدیر بوت‌کمپ",
+  ADMIN: "ادمین",
+};
+
+export function SettingsPage() {
+  const role = useAppSelector((s) => s.auth.role);
+  const dispatch = useAppDispatch();
+  const navigate = useNavigate();
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+    } finally {
+      dispatch(clearSession());
+      navigate("/login");
+    }
+  };
+
+  return (
+    <div className="mx-auto max-w-lg">
+      <h1 className="text-2xl font-bold">تنظیمات</h1>
+
+      <Card className="mt-6">
+        <div className="text-sm">
+          <span className="opacity-60">نقش شما: </span>
+          {role ? ROLE_LABEL[role] : "—"}
+        </div>
+      </Card>
+
+      <Card className="mt-4 flex items-center justify-between">
+        <span className="text-sm">پوسته</span>
+        <ThemeSwitcher />
+      </Card>
+
+      <Button variant="ghost" className="mt-6" onClick={handleLogout}>
+        خروج از حساب
+      </Button>
+    </div>
+  );
+}

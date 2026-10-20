@@ -1,0 +1,140 @@
+import { useRef } from "react";
+import { useEyeTracking } from "./useEyeTracking";
+
+type Variant = "girl" | "boy";
+
+const EYE_L = { cx: 96, cy: 108 };
+const EYE_R = { cx: 144, cy: 108 };
+
+/**
+ * A flat-vector cartoon character portrait for the landing-page hero
+ * — the "personal branding" mascot the user asked for, not a
+ * dimensional/realistic face. Two variants (girl/boy) exist so the
+ * hero doesn't default to one gender; LandingPage shows both side by
+ * side. Eyes track the cursor anywhere on the page (see
+ * useEyeTracking) and blink idly so the character feels alive.
+ */
+export function InteractiveFace({ variant, className = "" }: { variant: Variant; className?: string }) {
+  const svgRef = useRef<SVGSVGElement>(null);
+  const { leftPupil, rightPupil, blinking } = useEyeTracking(svgRef, (rect) => {
+    const scaleX = rect.width / 240;
+    const scaleY = rect.height / 240;
+    return {
+      left: { cx: rect.left + EYE_L.cx * scaleX, cy: rect.top + EYE_L.cy * scaleY },
+      right: { cx: rect.left + EYE_R.cx * scaleX, cy: rect.top + EYE_R.cy * scaleY },
+    };
+  });
+
+  return (
+    <svg
+      ref={svgRef}
+      viewBox="0 0 240 240"
+      className={className}
+      role="img"
+      aria-label={
+        variant === "girl"
+          ? "کاراکتر انیمیشنی دختر — چشم‌هایش موس را دنبال می‌کنند"
+          : "کاراکتر انیمیشنی پسر — چشم‌هایش موس را دنبال می‌کنند"
+      }
+    >
+      <defs>
+        <radialGradient id={`face-glow-${variant}`} cx="50%" cy="35%" r="65%">
+          <stop offset="0%" stopColor="var(--accent)" stopOpacity="0.3" />
+          <stop offset="100%" stopColor="var(--accent)" stopOpacity="0" />
+        </radialGradient>
+      </defs>
+
+      <circle cx="120" cy="112" r="88" fill={`url(#face-glow-${variant})`} />
+
+      {/* Hair — behind the head, variant-specific silhouette */}
+      {variant === "girl" ? (
+        <path
+          d="M40 112 Q34 40 120 32 Q206 40 200 112 Q200 96 178 92 Q186 150 172 190 Q182 140 168 100 Q120 84 72 100 Q58 140 68 190 Q54 150 62 92 Q40 96 40 112 Z"
+          fill="var(--accent)"
+        />
+      ) : (
+        <path
+          d="M42 110 Q36 44 120 36 Q204 44 198 110 Q198 84 176 78 Q150 66 120 68 Q90 66 64 78 Q42 84 42 110 Z"
+          fill="var(--accent)"
+        />
+      )}
+
+      {/* Head */}
+      <ellipse cx="120" cy="122" rx="78" ry="76" fill="var(--surface)" stroke="var(--accent)" strokeWidth="3" />
+
+      {/* Ears */}
+      <circle cx="44" cy="122" r="14" fill="var(--surface)" stroke="var(--accent)" strokeWidth="2.5" />
+      <circle cx="196" cy="122" r="14" fill="var(--surface)" stroke="var(--accent)" strokeWidth="2.5" />
+
+      {variant === "girl" && (
+        <>
+          {/* Side hair strands framing the face */}
+          <path d="M46 100 Q36 150 54 196" fill="none" stroke="var(--accent)" strokeWidth="10" strokeLinecap="round" />
+          <path d="M194 100 Q204 150 186 196" fill="none" stroke="var(--accent)" strokeWidth="10" strokeLinecap="round" />
+          {/* Hair bow */}
+          <path
+            d="M156 46 L170 38 L170 54 Z M156 46 L142 38 L142 54 Z"
+            fill="var(--accent)"
+          />
+          <circle cx="156" cy="46" r="4" fill="var(--accent)" />
+        </>
+      )}
+      {variant === "boy" && (
+        <>
+          {/* Short textured fringe */}
+          <path d="M70 70 Q80 54 96 68" fill="none" stroke="var(--accent)" strokeWidth="5" strokeLinecap="round" />
+          <path d="M104 62 Q120 46 136 62" fill="none" stroke="var(--accent)" strokeWidth="5" strokeLinecap="round" />
+          <path d="M144 68 Q160 54 170 70" fill="none" stroke="var(--accent)" strokeWidth="5" strokeLinecap="round" />
+        </>
+      )}
+
+      {/* Cheeks blush */}
+      <ellipse cx="76" cy="152" rx="12" ry="7" fill="var(--accent)" opacity="0.2" />
+      <ellipse cx="164" cy="152" rx="12" ry="7" fill="var(--accent)" opacity="0.2" />
+
+      {/* Eyebrows */}
+      <path d="M76 86 Q86 78 100 84" fill="none" stroke="var(--accent)" strokeWidth="4" strokeLinecap="round" />
+      <path d="M140 84 Q154 78 164 86" fill="none" stroke="var(--accent)" strokeWidth="4" strokeLinecap="round" />
+
+      {/* Eyes */}
+      <g opacity={blinking ? 0 : 1} style={{ transition: "opacity 0.08s" }}>
+        <circle cx={EYE_L.cx} cy={EYE_L.cy} r="20" fill="#ffffff" stroke="var(--accent)" strokeWidth="2" />
+        <circle cx={EYE_R.cx} cy={EYE_R.cy} r="20" fill="#ffffff" stroke="var(--accent)" strokeWidth="2" />
+        <circle
+          cx={EYE_L.cx + leftPupil.x}
+          cy={EYE_L.cy + leftPupil.y}
+          r="8"
+          fill="var(--accent)"
+          style={{ transition: "cx 0.05s linear, cy 0.05s linear" }}
+        />
+        <circle
+          cx={EYE_R.cx + rightPupil.x}
+          cy={EYE_R.cy + rightPupil.y}
+          r="8"
+          fill="var(--accent)"
+          style={{ transition: "cx 0.05s linear, cy 0.05s linear" }}
+        />
+        <circle cx={EYE_L.cx - 4 + leftPupil.x} cy={EYE_L.cy - 4 + leftPupil.y} r="2.3" fill="#ffffff" />
+        <circle cx={EYE_R.cx - 4 + rightPupil.x} cy={EYE_R.cy - 4 + rightPupil.y} r="2.3" fill="#ffffff" />
+      </g>
+      {blinking && (
+        <>
+          <path d="M78 108 Q96 116 114 108" fill="none" stroke="var(--accent)" strokeWidth="3" strokeLinecap="round" />
+          <path d="M126 108 Q144 116 162 108" fill="none" stroke="var(--accent)" strokeWidth="3" strokeLinecap="round" />
+        </>
+      )}
+
+      {/* Nose */}
+      <path d="M120 116 Q123 126 118 130" fill="none" stroke="var(--accent)" strokeWidth="2.5" strokeLinecap="round" opacity="0.55" />
+
+      {/* Smile */}
+      <path d="M98 148 Q120 164 142 148" fill="none" stroke="var(--accent)" strokeWidth="4" strokeLinecap="round" />
+
+      {/* Star — identity signature, matches the platform brand mark */}
+      <path
+        d="M120 18 L124 30 L137 30 L127 38 L131 50 L120 42 L109 50 L113 38 L103 30 L116 30 Z"
+        fill="var(--accent)"
+      />
+    </svg>
+  );
+}

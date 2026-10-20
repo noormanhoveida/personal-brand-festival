@@ -1,0 +1,150 @@
+import { ForgotPasswordPage } from "./pages/ForgotPasswordPage";
+import AdminLandingPage from "./pages/admin/AdminLandingPage";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { PublicLayout } from "./layouts/PublicLayout";
+import { DashboardLayout } from "./layouts/DashboardLayout";
+import { LandingPage } from "./pages/LandingPage";
+import { LoginPage } from "./pages/LoginPage";
+import { RegisterPage } from "./pages/RegisterPage";
+import { VerifyEmailPage } from "./pages/VerifyEmailPage";
+import { ShowcasePage } from "./pages/ShowcasePage";
+import { CommunityPage } from "./pages/CommunityPage";
+import { DashboardHomePage } from "./pages/DashboardHomePage";
+import { ProfilePage } from "./pages/ProfilePage";
+import { JourneyListPage } from "./pages/JourneyListPage";
+import { JourneySectionPage } from "./pages/JourneySectionPage";
+import { BootcampsListPage } from "./pages/BootcampsListPage";
+import { BootcampDetailPage } from "./pages/BootcampDetailPage";
+import { MirrorPage } from "./pages/MirrorPage";
+import { PersonalPageEditorPage } from "./pages/PersonalPageEditorPage";
+import { PublicProfilePage } from "./pages/PublicProfilePage";
+import { PublicFeedbackFormPage } from "./pages/PublicFeedbackFormPage";
+import { TransformationPage } from "./pages/TransformationPage";
+import { SettingsPage } from "./pages/SettingsPage";
+import { ManagerBootcampsPage } from "./pages/manager/ManagerBootcampsPage";
+import { ManagerLiveSessionPage } from "./pages/manager/ManagerLiveSessionPage";
+import { BootcampLivePage } from "./pages/BootcampLivePage";
+import { AdminFormsPage } from "./pages/admin/AdminFormsPage";
+import { AdminFormBuilderPage } from "./pages/admin/AdminFormBuilderPage";
+import { PublicFormPage } from "./pages/PublicFormPage";
+import { AdminOverviewPage } from "./pages/admin/AdminOverviewPage";
+import { AdminBootcampsPage } from "./pages/admin/AdminBootcampsPage";
+import { AdminJourneyPage } from "./pages/admin/AdminJourneyPage";
+import { AdminUsersPage } from "./pages/admin/AdminUsersPage";
+import { AdminRegionsPage } from "./pages/admin/AdminRegionsPage";
+import { AdminParticipantsPage } from "./pages/admin/AdminParticipantsPage";
+import { AdminAssignmentsPage } from "./pages/admin/AdminAssignmentsPage";
+import { AdminCriteriaPage } from "./pages/admin/AdminCriteriaPage";
+import { AdminAnalyticsPage } from "./pages/admin/AdminAnalyticsPage";
+import { AdminShowcasePage } from "./pages/admin/AdminShowcasePage";
+import { AdminSituationsPage } from "./pages/admin/AdminSituationsPage";
+import { AdminLiveLogPage } from "./pages/admin/AdminLiveLogPage";
+import { AdminPreAssessmentsPage } from "./pages/admin/AdminPreAssessmentsPage";
+import { AdminChallengesPage } from "./pages/admin/AdminChallengesPage";
+import { ManagerChallengesPage } from "./pages/manager/ManagerChallengesPage";
+import { ChallengesPage } from "./pages/ChallengesPage";
+import { ChallengeReviewPage } from "./pages/evaluator/ChallengeReviewPage";
+import { LeaderboardsPage } from "./pages/evaluator/LeaderboardsPage";
+import { EvaluatorAssignedPage } from "./pages/evaluator/EvaluatorAssignedPage";
+import { EvaluatorReviewPage } from "./pages/evaluator/EvaluatorReviewPage";
+import { EvaluatorPreAssessmentPage } from "./pages/evaluator/EvaluatorPreAssessmentPage";
+import { ApprovalQueuePage } from "./pages/evaluator/ApprovalQueuePage";
+import { NotFoundPage } from "./pages/NotFoundPage";
+import { RequireAuth } from "./routes/RequireAuth";
+
+export function App() {
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route element={<PublicLayout />}>
+          <Route index element={<LandingPage />} />
+          <Route path="login" element={<LoginPage />} />
+          <Route path="forgot-password" element={<ForgotPasswordPage />} />
+          <Route path="register" element={<RegisterPage />} />
+          <Route path="verify-email" element={<VerifyEmailPage />} />
+          <Route path="showcase" element={<ShowcasePage />} />
+          <Route path="community" element={<CommunityPage />} />
+          {/* Public — no account needed to open these */}
+          <Route path="p/:slug" element={<PublicProfilePage />} />
+          <Route path="feedback/:token" element={<PublicFeedbackFormPage />} />
+          <Route path="forms/:slug" element={<PublicFormPage />} />
+        </Route>
+
+        <Route element={<RequireAuth />}>
+          <Route path="dashboard" element={<DashboardLayout />}>
+            <Route index element={<DashboardHomePage />} />
+            <Route path="journey" element={<JourneyListPage />} />
+            <Route path="journey/:sectionId" element={<JourneySectionPage />} />
+            <Route path="bootcamps" element={<BootcampsListPage />} />
+            <Route path="bootcamps/:bootcampId" element={<BootcampDetailPage />} />
+            <Route path="bootcamps/live/:sessionId" element={<BootcampLivePage />} />
+            <Route path="mirror" element={<MirrorPage />} />
+            {/* "بازخوردها" shows the same received-feedback view as "آینه من" for now */}
+            <Route path="feedback" element={<MirrorPage />} />
+            <Route path="profile" element={<ProfilePage />} />
+            <Route path="public-page" element={<PersonalPageEditorPage />} />
+            <Route path="transformation" element={<TransformationPage />} />
+            <Route path="challenges" element={<ChallengesPage />} />
+            <Route path="settings" element={<SettingsPage />} />
+          </Route>
+        </Route>
+
+        <Route element={<RequireAuth allow={["BOOTCAMP_MANAGER", "ADMIN"]} />}>
+          <Route path="dashboard/manager" element={<DashboardLayout />}>
+            <Route path="bootcamps" element={<ManagerBootcampsPage />} />
+            <Route path="bootcamps/:bootcampId/live" element={<ManagerLiveSessionPage />} />
+            <Route path="challenges" element={<ManagerChallengesPage />} />
+          </Route>
+        </Route>
+
+        <Route element={<RequireAuth allow={["EVALUATOR", "ADMIN"]} />}>
+          <Route path="dashboard/evaluator" element={<DashboardLayout />}>
+            <Route index element={<EvaluatorAssignedPage />} />
+            <Route path=":participantId" element={<EvaluatorReviewPage />} />
+            <Route path=":participantId/pre-assessment" element={<EvaluatorPreAssessmentPage />} />
+          </Route>
+          <Route path="dashboard/approval" element={<DashboardLayout />}>
+            <Route index element={<ApprovalQueuePage />} />
+          </Route>
+        </Route>
+
+        <Route element={<RequireAuth allow={["EVALUATOR", "BOOTCAMP_MANAGER", "ADMIN"]} />}>
+          <Route path="dashboard/leaderboards" element={<DashboardLayout />}>
+            <Route index element={<LeaderboardsPage />} />
+          </Route>
+          <Route path="dashboard/challenge-review" element={<DashboardLayout />}>
+            <Route path=":challengeId" element={<ChallengeReviewPage />} />
+          </Route>
+        </Route>
+
+        <Route element={<RequireAuth allow={["ADMIN"]} />}>
+          <Route path="dashboard/admin" element={<DashboardLayout />}>
+            <Route index element={<AdminOverviewPage />} />
+            <Route path="bootcamps" element={<AdminBootcampsPage />} />
+            <Route path="journey" element={<AdminJourneyPage />} />
+            <Route path="situations" element={<AdminSituationsPage />} />
+            <Route path="pre-assessment" element={<AdminPreAssessmentsPage />} />
+            <Route
+              path="pre-assessment/:participantId"
+              element={<EvaluatorPreAssessmentPage />}
+            />
+            <Route path="challenges" element={<AdminChallengesPage />} />
+            <Route path="live-sessions/:sessionId/log" element={<AdminLiveLogPage />} />
+            <Route path="users" element={<AdminUsersPage />} />
+            <Route path="regions" element={<AdminRegionsPage />} />
+            <Route path="participants" element={<AdminParticipantsPage />} />
+            <Route path="assignments" element={<AdminAssignmentsPage />} />
+            <Route path="criteria" element={<AdminCriteriaPage />} />
+            <Route path="analytics" element={<AdminAnalyticsPage />} />
+            <Route path="showcase" element={<AdminShowcasePage />} />
+            <Route path="landing" element={<AdminLandingPage />} />
+            <Route path="forms" element={<AdminFormsPage />} />
+            <Route path="forms/:id" element={<AdminFormBuilderPage />} />
+          </Route>
+        </Route>
+
+        <Route path="*" element={<NotFoundPage />} />
+      </Routes>
+    </BrowserRouter>
+  );
+}

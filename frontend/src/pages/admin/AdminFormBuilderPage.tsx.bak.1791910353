@@ -1,0 +1,529 @@
+import { useEffect, useState } from "react";
+import { useParams, Link } from "react-router-dom";
+import { listBootcamps, Bootcamp } from "../../api/bootcamps";
+import {
+  FormDetail,
+  FormQuestion,
+  QuestionInputType,
+  FormAnswer,
+  FormAnalytics,
+  getAdminFormById,
+  updateForm,
+  addQuestion,
+  updateQuestion,
+  deleteQuestion,
+  getFormAnswers,
+  getFormAnalytics,
+} from "../../api/forms";
+import { OptionsEditor } from "../../components/OptionsEditor";
+import { FormAnalyticsPanel } from "../../components/FormAnalyticsPanel";
+import { Button, Card, Input, Label, LoadError, Spinner, Textarea } from "../../components/ui";
+
+const INPUT_TYPE_LABELS: Record<QuestionInputType, string> = {
+  TEXT: "پاسخ متنی کوتاه",
+  LINK: "لینک یا آدرس اینترنتی",
+  PHOTO: "آپلود تصویر",
+  TRAIT_TAG: "انتخاب از صفات فردی (Trait)",
+  SINGLE_CHOICE: "تک‌گزینه‌ای (رادیویی)",
+  MULTI_CHOICE: "چندگزینه‌ای (چک‌باکس)",
+};
+
+export function AdminFormBuilderPage() {
+  const { id } = useParams<{ id: string }>();
+  const [form, setForm] = useState<FormDetail | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<"builder" | "settings" | "answers" | "analytics">("builder");
+
+  // New Question Form state
+  const [showAddQ, setShowAddQ] = useState(false);
+  const [qLabel, setQLabel] = useState("");
+  const [qHelpText, setQHelpText] = useState("");
+  const [qType, setQType] = useState<QuestionInputType>("TEXT");
+  const [qOptions, setQOptions] = useState<string[]>(["گزینه ۱", "گزینه ۲"]);
+  const [qRequired, setQRequired] = useState(true);
+  const [qWeight, setQWeight] = useState<number | undefined>(undefined);
+  const [addingQ, setAddingQ] = useState(false);
+  const [editingQId, setEditingQId] = useState<string | null>(null);
+
+  // Settings State
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [slug, setSlug] = useState("");
+  const [bootcampId, setBootcampId] = useState<string | undefined>(undefined);
+  const [bootcamps, setBootcamps] = useState<Bootcamp[]>([]);
+  const [savingSettings, setSavingSettings] = useState(false);
+
+  // Answers & Analytics
+  const [answers, setAnswers] = useState<FormAnswer[]>([]);
+  const [analytics, setAnalytics] = useState<FormAnalytics | null>(null);
+  const [loadingAnswers, setLoadingAnswers] = useState(false);
+
+  const loadData = async () => {
+    if (!id) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await getAdminFormById(id);
+      setForm(data);
+      setTitle(data.title);
+      setDescription(data.description || "");
+      setSlug(data.slug);
+      setBootcampId(data.bootcampId || undefined);
+    } catch {
+      setError("خطا در بارگذاری اطلاعات فرم");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadData();
+    listBootcamps().then(setBootcamps).catch(console.error);
+  }, [id]);
+
+  const loadAnswersData = async () => {
+    if (!id) return;
+    setLoadingAnswers(true);
+    try {
+      const [ans, ana] = await Promise.all([getFormAnswers(id), getFormAnalytics(id)]);
+      setAnswers(ans);
+      setAnalytics(ana);
+    } catch {
+      console.error("خطا در دریافت پاسخ‌ها");
+    } finally {
+      setLoadingAnswers(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === "answers" || activeTab === "analytics") {
+      loadAnswersData();
+    }
+  }, [activeTab]);
+
+  const handleAddQuestion = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!id || !qLabel.trim()) return;
+    setAddingQ(true);
+    try {
+      const payload = {
+        label: qLabel.trim(),
+        helpText: qHelpText.trim() || undefined,
+        inputType: qType,
+        options: (qType === "SINGLE_CHOICE" || qType === "MULTI_CHOICE") ? qOptions.filter(Boolean) : [],
+        isRequired: qRequired,
+        weight: qWeight ? Number(qWeight) : undefined,
+      };
+      if (editingQId) {
+        await updateQuestion(editingQId, payload);
+        setEditingQId(null);
+      } else {
+        await addQuestion(id, payload);
+      }
+      setQLabel("");
+      setQHelpText("");
+      setQOptions(["گزینه ۱", "گزینه ۲"]);
+      setShowAddQ(false);
+      loadData();
+    } catch (err: any) {
+      alert(err.response?.data?.error || "خطا در افزودن سوال");
+    } finally {
+      setAddingQ(false);
+    }
+  };
+
+  const startEditQuestion = (q: any) => {
+    setEditingQId(q.id);
+    setQLabel(q.label ?? "");
+    setQHelpText(q.helpText ?? "");
+    setQType(q.inputType as QuestionInputType);
+    setQOptions(
+      q.options && q.options.length ? q.options : ["گزینه ۱", "گزینه ۲"]
+    );
+    setQRequired(!!q.isRequired);
+    setQWeight(q.weight ?? undefined);
+    setShowAddQ(true);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const handleDeleteQuestion = async (qId: string) => {
+    if (!id || !window.confirm("آیا از حذف این سوال مطمئن هستید؟")) return;
+    try {
+      await deleteQuestion(id, qId);
+      loadData();
+    } catch {
+      alert("خطا در حذف سوال");
+    }
+  };
+
+  const handleSaveSettings = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!id) return;
+    setSavingSettings(true);
+    try {
+      await updateForm(id, {
+        title: title.trim(),
+        description: description.trim() || undefined,
+        slug: slug.trim() || undefined,
+        bootcampId: bootcampId || undefined,
+      });
+      alert("تنظیمات با موفقیت ذخیره شد.");
+      loadData();
+    } catch (err: any) {
+      alert(err.response?.data?.error || "خطا در ذخیره تنظیمات");
+    } finally {
+      setSavingSettings(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex justify-center py-20">
+        <Spinner />
+      </div>
+    );
+  }
+
+  if (error || !form) {
+    return <LoadError message={error || "فرم یافت نشد"} onRetry={loadData} />;
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Top Header */}
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-2 text-xs opacity-60">
+            <Link to="/dashboard/admin/forms" className="hover:underline">
+              ← بازگشت به لیست فرم‌ها
+            </Link>
+          </div>
+          <h1 className="mt-1 text-xl font-bold">{form.title}</h1>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <a
+            href={`/forms/${form.slug}`}
+            target="_blank"
+            rel="noreferrer"
+            className="rounded-full px-3 py-1.5 text-xs font-medium"
+            style={{ backgroundColor: "var(--surface)", color: "var(--text)" }}
+          >
+            مشاهده فرم عمومی ↗
+          </a>
+        </div>
+      </div>
+
+      {/* Tabs */}
+      <div className="flex gap-2 border-b pb-2" style={{ borderColor: "var(--surface)" }}>
+        <button
+          onClick={() => setActiveTab("builder")}
+          className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
+            activeTab === "builder" ? "bg-accent text-white" : "opacity-70"
+          }`}
+          style={activeTab === "builder" ? { backgroundColor: "var(--accent)", color: "var(--bg)" } : {}}
+        >
+          طراحی سوالات ({form.questions.length})
+        </button>
+        <button
+          onClick={() => setActiveTab("answers")}
+          className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
+            activeTab === "answers" ? "bg-accent text-white" : "opacity-70"
+          }`}
+          style={activeTab === "answers" ? { backgroundColor: "var(--accent)", color: "var(--bg)" } : {}}
+        >
+          پاسخ‌های ثبت‌شده
+        </button>
+        <button
+          onClick={() => setActiveTab("analytics")}
+          className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
+            activeTab === "analytics" ? "bg-accent text-white" : "opacity-70"
+          }`}
+          style={activeTab === "analytics" ? { backgroundColor: "var(--accent)", color: "var(--bg)" } : {}}
+        >
+          گزارش و آمار
+        </button>
+        <button
+          onClick={() => setActiveTab("settings")}
+          className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
+            activeTab === "settings" ? "bg-accent text-white" : "opacity-70"
+          }`}
+          style={activeTab === "settings" ? { backgroundColor: "var(--accent)", color: "var(--bg)" } : {}}
+        >
+          تنظیمات فرم
+        </button>
+      </div>
+
+      {/* Tab: Builder */}
+      {activeTab === "builder" && (
+        <div className="space-y-4">
+          <div className="flex justify-between items-center">
+            <h2 className="text-base font-semibold">سوالات فرم</h2>
+            <Button onClick={() => setShowAddQ(!showAddQ)}>
+              {showAddQ ? "بستن فرم سوال" : "+ افزودن سوال جدید"}
+            </Button>
+          </div>
+
+          {showAddQ && (
+            <Card className="animate-fadeIn">
+              <form onSubmit={handleAddQuestion} className="space-y-4">
+                <h3 className="font-semibold text-sm">{editingQId ? "ویرایش سوال" : "افزودن سوال جدید"}</h3>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div>
+                    <Label>متن سؤال *</Label>
+                    <Input
+                      value={qLabel}
+                      onChange={(e) => setQLabel(e.target.value)}
+                      placeholder="متن سوال را بنویسید..."
+                      required
+                    />
+                  </div>
+                  <div>
+                    <Label>نوع پاسخ</Label>
+                    <select
+                      value={qType}
+                      onChange={(e) => setQType(e.target.value as QuestionInputType)}
+                      className="w-full rounded-lg border px-3 py-2 text-sm outline-none"
+                      style={{
+                        backgroundColor: "var(--surface)",
+                        borderColor: "var(--surface)",
+                        color: "var(--text)",
+                      }}
+                    >
+                      {Object.entries(INPUT_TYPE_LABELS).map(([k, label]) => (
+                        <option key={k} value={k}>
+                          {label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div>
+                  <Label>راهنمای سوال (اختیاری)</Label>
+                  <Input
+                    value={qHelpText}
+                    onChange={(e) => setQHelpText(e.target.value)}
+                    placeholder="توضیح کمکی در زیر سوال..."
+                  />
+                </div>
+
+                {(qType === "SINGLE_CHOICE" || qType === "MULTI_CHOICE") && (
+                  <div>
+                    <Label>گزینه‌ها</Label>
+                    <OptionsEditor options={qOptions} onChange={setQOptions} />
+                  </div>
+                )}
+
+                <div className="flex items-center gap-6">
+                  <label className="flex items-center gap-2 text-xs cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={qRequired}
+                      onChange={(e) => setQRequired(e.target.checked)}
+                    />
+                    پاسخ به این سوال الزامی است
+                  </label>
+                  <div className="flex items-center gap-2 text-xs">
+                    <span>وزن / امتیاز:</span>
+                    <input
+                      type="number"
+                      step="0.5"
+                      value={qWeight ?? ""}
+                      onChange={(e) => setQWeight(e.target.value ? Number(e.target.value) : undefined)}
+                      className="w-20 rounded border px-2 py-1"
+                      style={{
+                        backgroundColor: "var(--surface)",
+                        borderColor: "var(--surface)",
+                        color: "var(--text)",
+                      }}
+                    />
+                  </div>
+                </div>
+
+                <div className="flex justify-end gap-2">
+                  <Button type="button" variant="ghost" onClick={() => { setShowAddQ(false); setEditingQId(null); }}>
+                    انصراف
+                  </Button>
+                  <Button type="submit" disabled={addingQ}>
+                    {addingQ ? "در حال ذخیره..." : editingQId ? "ذخیره تغییرات" : "ثبت سوال"}
+                  </Button>
+                </div>
+              </form>
+            </Card>
+          )}
+
+          {form.questions.length === 0 ? (
+            <Card className="py-12 text-center">
+              <p className="text-sm opacity-60">هنوز سوالی برای این فرم تعریف نشده است.</p>
+              <Button variant="ghost" className="mt-3 text-xs" onClick={() => setShowAddQ(true)}>
+                + ایجاد اولین سوال
+              </Button>
+            </Card>
+          ) : (
+            <div className="space-y-3">
+              {form.questions.map((q, idx) => (
+                <Card key={q.id} className="flex items-start justify-between gap-4">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-bold opacity-40">#{idx + 1}</span>
+                      <span className="font-semibold">{q.label}</span>
+                      {q.isRequired && (
+                        <span className="text-xs text-red-400 font-bold">* الزامی</span>
+                      )}
+                    </div>
+                    {q.helpText && <p className="text-xs opacity-60">{q.helpText}</p>}
+                    <div className="flex items-center gap-3 text-xs opacity-70">
+                      <span className="rounded bg-surface px-2 py-0.5" style={{ backgroundColor: "var(--surface)" }}>
+                        {INPUT_TYPE_LABELS[q.inputType] || q.inputType}
+                      </span>
+                      {q.weight && <span>وزن: {q.weight}</span>}
+                    </div>
+                    {(q.inputType === "SINGLE_CHOICE" || q.inputType === "MULTI_CHOICE") && q.options && (
+                      <div className="flex flex-wrap gap-1.5 pt-2">
+                        {q.options.map((opt, oIdx) => (
+                          <span
+                            key={oIdx}
+                            className="rounded-full px-2.5 py-0.5 text-xs"
+                            style={{ backgroundColor: "var(--surface)" }}
+                          >
+                            • {opt}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="ghost"
+                      className="text-xs text-blue-400 hover:text-blue-500"
+                      onClick={() => startEditQuestion(q)}
+                    >
+                      ویرایش
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      className="text-xs text-red-400 hover:text-red-500"
+                      onClick={() => handleDeleteQuestion(q.id)}
+                    >
+                      حذف
+                    </Button>
+                  </div>
+                </Card>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Tab: Settings */}
+      {activeTab === "settings" && (
+        <Card>
+          <form onSubmit={handleSaveSettings} className="space-y-4 max-w-xl">
+            <h3 className="font-semibold text-base">تنظیمات اصلی فرم</h3>
+            <div>
+              <Label>عنوان فرم</Label>
+              <Input value={title} onChange={(e) => setTitle(e.target.value)} required />
+            </div>
+            <div>
+              <Label>نامک انگلیسی (Slug)</Label>
+              <Input value={slug} onChange={(e) => setSlug(e.target.value)} required />
+            </div>
+            <div>
+              <Label>اتصال به بوت‌کمپ (اختیاری)</Label>
+              <select
+                className="w-full p-2 border rounded"
+                value={bootcampId || ""}
+                onChange={(e) => setBootcampId(e.target.value || undefined)}
+              >
+                <option value="">بدون اتصال (فرم عمومی)</option>
+                {bootcamps.map((b) => (
+                  <option key={b.id} value={b.id}>{b.title} ({b.status})</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <Label>توضیحات فرم</Label>
+              <Textarea
+                rows={3}
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+              />
+            </div>
+            <Button type="submit" disabled={savingSettings}>
+              {savingSettings ? "در حال ذخیره..." : "ذخیره تغییرات"}
+            </Button>
+          </form>
+        </Card>
+      )}
+
+      {/* Tab: Answers */}
+      {activeTab === "answers" && (
+        <div className="space-y-4">
+          {loadingAnswers ? (
+            <div className="flex justify-center py-12">
+              <Spinner />
+            </div>
+          ) : answers.length === 0 ? (
+            <Card className="py-12 text-center opacity-70">
+              هنوز پاسخی برای این فرم ثبت نشده است.
+            </Card>
+          ) : (
+            <div className="space-y-3">
+              <div className="text-xs opacity-70">مجموع کل پاسخ‌ها: {answers.length}</div>
+              {answers.map((ans, idx) => (
+                <Card key={ans.id} className="space-y-3">
+                  <div className="flex justify-between text-xs opacity-70 border-b pb-2" style={{ borderColor: "var(--surface)" }}>
+                    <span>
+                      شرکت‌کننده:{" "}
+                      {ans.participant
+                        ? `${ans.participant.firstName} ${ans.participant.lastName} (${ans.participant.user?.email || "کاربر"})`
+                        : ans.guestName
+                        ? `${ans.guestName} (${ans.guestEmail})`
+                        : "مهمان ناشناس"}
+                    </span>
+                    <span>{new Date(ans.createdAt).toLocaleString("fa-IR")}</span>
+                  </div>
+                  <div className="space-y-2 text-sm">
+                    {ans.items.map((it) => (
+                      <div key={it.id} className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                        <span className="font-medium opacity-80">
+                          {it.formQuestion?.label || "سوال"}:
+                        </span>
+                        <span className="md:col-span-2 font-mono text-xs">
+                          {typeof it.value === "object" ? JSON.stringify(it.value) : String(it.value)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </Card>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Tab: Analytics */}
+      {activeTab === "analytics" && (
+        <div className="space-y-4">
+          <div className="flex justify-end no-print">
+            <Button onClick={() => window.print()}>🖨️ چاپ / خروجی PDF</Button>
+          </div>
+          {loadingAnswers ? (
+            <div className="flex justify-center py-12">
+              <Spinner />
+            </div>
+          ) : !analytics ? (
+            <Card className="py-12 text-center opacity-70">داده‌های آماری در دسترس نیست.</Card>
+          ) : (
+            <div className="print-area">
+              <FormAnalyticsPanel analytics={analytics} />
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}

@@ -1,0 +1,41 @@
+import { z } from "zod";
+import { BootcampStatus, QuestionInputType, ResponseStage } from "@prisma/client";
+
+export const bootcampInputSchema = z.object({
+  title: z.string().min(2, "عنوان بوت‌کمپ الزامی است."),
+  description: z.string().optional(),
+  instructor: z.string().optional(),
+  coverImageUrl: z.string().optional(),
+  teaserVideoUrl: z.string().optional(),
+  recordingUrl: z.string().url("لینک دانلود باید یک آدرس معتبر باشد.").optional().or(z.literal("")),
+  date: z.coerce.date(),
+  startTime: z.coerce.date(),
+  endTime: z.coerce.date(),
+  deadline: z.coerce.date().optional(),
+  journeySectionId: z.string().optional(),
+});
+
+export const bootcampUpdateSchema = bootcampInputSchema.partial();
+
+export const bootcampStatusSchema = z.object({
+  status: z.nativeEnum(BootcampStatus),
+});
+
+export const questionInputSchema = z.object({
+  text: z.string().min(2, "متن سؤال الزامی است."),
+  stage: z.nativeEnum(ResponseStage),
+  inputType: z.nativeEnum(QuestionInputType).default(QuestionInputType.TEXT),
+  situationId: z.string().optional(),
+  options: z.array(z.string()).default([]),
+  order: z.number().int().default(0),
+});
+
+export const toggleAccessSchema = z.object({
+  userId: z.string().min(1, "شناسه کاربر الزامی است.").optional(),
+  participantId: z.string().min(1).optional(),
+  hasAccess: z.boolean({ required_error: "وضعیت دسترسی الزامی است." }),
+});
+
+export type BootcampInput = z.infer<typeof bootcampInputSchema>;
+export type BootcampUpdateInput = z.infer<typeof bootcampUpdateSchema>;
+export type QuestionInput = z.infer<typeof questionInputSchema>;

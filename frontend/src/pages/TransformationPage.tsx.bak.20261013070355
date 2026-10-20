@@ -1,0 +1,100 @@
+import { useEffect, useState } from "react";
+import {
+  Radar,
+  RadarChart,
+  PolarGrid,
+  PolarAngleAxis,
+  PolarRadiusAxis,
+  ResponsiveContainer,
+} from "recharts";
+import { listMyResponses, ResponseWithVersions } from "../api/responses";
+import { JourneySection, listJourneySections } from "../api/journey";
+import { Card, LoadError, Spinner } from "../components/ui";
+
+export function TransformationPage() {
+  const [responses, setResponses] = useState<ResponseWithVersions[] | null>(null);
+  const [sections, setSections] = useState<JourneySection[]>([]);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  const reload = () => {
+    setLoadError(null);
+    Promise.all([listMyResponses(), listJourneySections()])
+      .then(([r, s]) => {
+        setResponses(r);
+        setSections(s);
+      })
+      .catch(() => setLoadError("بارگذاری مسیر تحول با خطا مواجه شد."));
+  };
+
+  useEffect(reload, []);
+
+  if (loadError) return <LoadError message={loadError} onRetry={reload} />;
+
+  if (!responses) {
+    return (
+      <div className="flex justify-center py-16">
+        <Spinner />
+      </div>
+    );
+  }
+
+  const beforeAfter = responses.filter((r) => r.versions.length >= 2);
+
+  const radarData = sections.map((s) => ({
+    section: s.title,
+    پاسخ‌ها: responses.filter((r) => r.question.journeySectionId === s.id).length,
+  }));
+
+  const accent = getComputedStyle(document.documentElement).getPropertyValue("--accent").trim() || "#c9a24b";
+
+  return (
+    <div className="mx-auto max-w-3xl">
+      <h1 className="text-2xl font-bold">مسیر تحول من</h1>
+      <p className="mt-1 text-sm opacity-70">
+        مقایسه‌ی پاسخ‌های اولیه با آخرین نسخه‌ها، و پیشرفت شما در هر بخش از مسیر برند شخصی.
+      </p>
+
+      <Card className="mt-6">
+        <h2 className="mb-4 text-sm font-semibold">پیشرفت در بخش‌های مسیر</h2>
+        <div style={{ height: 300 }}>
+          <ResponsiveContainer width="100%" height="100%">
+            <RadarChart data={radarData}>
+              <PolarGrid stroke="rgba(255,255,255,0.1)" />
+              <PolarAngleAxis dataKey="section" tick={{ fill: "currentColor", fontSize: 11, opacity: 0.7 }} />
+              <PolarRadiusAxis tick={{ fill: "currentColor", fontSize: 10, opacity: 0.5 }} />
+              <Radar dataKey="پاسخ‌ها" stroke={accent} fill={accent} fillOpacity={0.35} />
+            </RadarChart>
+          </ResponsiveContainer>
+        </div>
+      </Card>
+
+      <h2 className="mt-8 text-lg font-semibold">مقایسه قبل و بعد</h2>
+      <div className="mt-3 space-y-4">
+        {beforeAfter.map((r) => {
+          const first = r.versions[0];
+          const last = r.versions[r.versions.length - 1];
+          return (
+            <Card key={r.id}>
+              <p className="text-sm font-medium">{r.question.text}</p>
+              <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="rounded-lg p-3" style={{ backgroundColor: "var(--surface)" }}>
+                  <div className="text-xs opacity-60">قبل</div>
+                  <p className="mt-1 text-sm">{first.content}</p>
+                </div>
+                <div className="rounded-lg border p-3" style={{ borderColor: "var(--accent)" }}>
+                  <div className="text-xs" style={{ color: "var(--accent)" }}>بعد</div>
+                  <p className="mt-1 text-sm">{last.content}</p>
+                </div>
+              </div>
+            </Card>
+          );
+        })}
+        {beforeAfter.length === 0 && (
+          <p className="text-sm opacity-60">
+            هنوز موردی با نسخه‌ی «بعد» ثبت نکرده‌اید — بعد از شرکت در بوت‌کمپ‌ها، این بخش پر می‌شود.
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}

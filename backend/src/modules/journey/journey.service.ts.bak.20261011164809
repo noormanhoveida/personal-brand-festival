@@ -1,0 +1,140 @@
+import { prisma } from "../../config/db";
+import { AppError } from "../../utils/errors";
+
+export class JourneyError extends AppError {}
+
+export async function listJourneySections() {
+  return prisma.journeySection.findMany({
+    orderBy: { order: "asc" },
+  });
+}
+
+/**
+ * Admin authoring of the roadmap itself — the 8-or-so lit/unlit
+ * points participants walk through. Previously this only existed as
+ * seed data; `key` stays admin-supplied (not auto-slugified) since
+ * it's a stable identifier other config may reference by name, same
+ * as the seeded sections ("identity", "strengths", ...).
+ */
+export async function createJourneySection(input: {
+  key: string;
+  title: string;
+  description?: string;
+  order?: number;
+}) {
+  const existing = await prisma.journeySection.findUnique({ where: { key: input.key } });
+  if (existing) {
+    throw new JourneyError("بخشی با این شناسه (key) از قبل وجود دارد.", 409);
+  }
+  const order = input.order ?? (await prisma.journeySection.count());
+  return prisma.journeySection.create({
+    data: { key: input.key, title: input.title, description: input.description, order },
+  });
+}
+
+export async function updateJourneySection(
+  sectionId: string,
+  input: { title?: string; description?: string; order?: number }
+) {
+  const section = await prisma.journeySection.findUnique({ where: { id: sectionId } });
+  if (!section) {
+    throw new JourneyError("این بخش از مسیر برند شخصی یافت نشد.", 404);
+  }
+  return prisma.journeySection.update({ where: { id: sectionId }, data: input });
+}
+
+/**
+ * Refuses to delete a section that still has questions or bootcamps
+ * pointing at it — deleting it would silently orphan a participant's
+ * already-answered questions off the roadmap. Reassign or remove
+ * those first; this is a deliberate guardrail, not a limitation to
+ * work around.
+ */
+export async function deleteJourneySection(sectionId: string) {
+  const section = await prisma.journeySection.findUnique({
+    where: { id: sectionId },
+    include: { _count: { select: { questions: true, bootcamps: true } } },
+  });
+  if (!section) {
+    throw new JourneyError("این بخش از مسیر برند شخصی یافت نشد.", 404);
+  }
+  if (section._count.questions > 0 || section._count.bootcamps > 0) {
+    throw new JourneyError(
+      "این بخش سؤال یا بوت‌کمپ متصل دارد و قابل حذف نیست — ابتدا آن‌ها را جابه‌جا یا حذف کنید.",
+      409
+    );
+  }
+  await prisma.journeySection.delete({ where: { id: sectionId } });
+}
+
+export async function getJourneySectionById(sectionId: string) {
+  const section = await prisma.journeySection.findUnique({
+    where: { id: sectionId },
+    include: {
+      questions: { orderBy: { order: "asc" } },
+      bootcamps: { orderBy: { date: "asc" } },
+    },
+  });
+
+  if (!section) {
+    throw new JourneyError("این بخش از مسیر برند شخصی یافت نشد.", 404);
+  }
+
+  return section;
+}
+
+/**
+ * A question attached directly to a journey section, with no bootcamp
+ * involved — for standalone roadmap prompts like "درباره هویت خودت
+ * بنویس" that aren't tied to any specific workshop. Always BEFORE
+ * stage: standalone prompts don't have a bootcamp lifecycle to be
+ * "after" of.
+ */
+export async function addSectionQuestion(
+  sectionId: string,
+  input: {
+    text: string;
+    inputType: "TEXT" | "LINK" | "PHOTO" | "TRAIT_TAG" | "SINGLE_CHOICE" | "MULTI_CHOICE";
+    situationId?: string;
+    options?: string[];
+    order?: number;
+  }
+) {
+  const section = await prisma.journeySection.findUnique({ where: { id: sectionId } });
+  if (!section) {
+    throw new JourneyError("این بخش از مسیر برند شخصی یافت نشد.", 404);
+  }
+
+  return prisma.question.create({
+    data: {
+      text: input.text,
+      stage: "BEFORE",
+      inputType: input.inputType,
+      situationId: input.situationId,
+      options: input.options ?? [],
+      order: input.order ?? 0,
+      journeySectionId: sectionId,
+    },
+  });
+}
+
+/**
+ * Attaches an existing standalone question (e.g. one from the
+ * auto-generated trait/situation question bank) to this section,
+ * instead of authoring a new one — the realistic way to place any of
+ * a 2000-question bank onto the roadmap.
+ */
+export async function attachQuestionToSection(sectionId: string, questionId: string) {
+  const section = await prisma.journeySection.findUnique({ where: { id: sectionId } });
+  if (!section) {
+    throw new JourneyError("این بخش از مسیر برند شخصی یافت نشد.", 404);
+  }
+  const question = await prisma.question.findUnique({ where: { id: questionId } });
+  if (!question) {
+    throw new JourneyError("سؤال یافت نشد.", 404);
+  }
+  return prisma.question.update({
+    where: { id: questionId },
+    data: { journeySectionId: sectionId },
+  });
+}

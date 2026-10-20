@@ -1,0 +1,131 @@
+import { useState } from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { useAppDispatch } from "../hooks/redux";
+import { setSession } from "../features/auth/authSlice";
+import { resendPhoneVerification, resendVerification, verifyEmail, verifyPhone } from "../api/auth";
+
+function toEnglishDigits(str: string) {
+  return str
+    .replace(/[۰-۹]/g, (d) => String(d.charCodeAt(0) - 1776))
+    .replace(/[٠-٩]/g, (d) => String(d.charCodeAt(0) - 1632))
+    .replace(/\s+/g, "");
+}
+
+export function VerifyEmailPage() {
+  const dispatch = useAppDispatch();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const state = (location.state as { email?: string; phone?: string; channel?: "email" | "phone"; contact?: string } | null);
+
+  const initialChannel = state?.channel ?? (state?.phone ? "phone" : "email");
+  const initialTarget = state?.contact ?? state?.phone ?? state?.email ?? "";
+
+  const [channel] = useState<"phone" | "email">(initialChannel);
+  const [target, setTarget] = useState(initialTarget);
+  const [code, setCode] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [resending, setResending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [info, setInfo] = useState<string | null>(
+    initialTarget ? `کد ۶ رقمی به ${channel === "phone" ? "شماره" : "ایمیل"} شما ارسال شد.` : null
+  );
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSubmitting(true);
+    setError(null);
+    try {
+      const cleanCode = toEnglishDigits(code);
+      const cleanTarget = channel === "phone" ? toEnglishDigits(target) : target.trim().toLowerCase();
+
+      const res = channel === "phone"
+        ? await verifyPhone(cleanTarget, cleanCode)
+        : await verifyEmail(cleanTarget, cleanCode);
+
+      dispatch(setSession({ accessToken: res.accessToken, role: res.role }));
+      navigate("/dashboard", { replace: true });
+    } catch (err: any) {
+      setError(err?.response?.data?.message ?? "کد نامعتبر یا منقضی شده است.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleResend = async () => {
+    setResending(true);
+    setError(null);
+    setInfo(null);
+    try {
+      const cleanTarget = channel === "phone" ? toEnglishDigits(target) : target.trim().toLowerCase();
+      if (channel === "phone") {
+        await resendPhoneVerification(cleanTarget);
+      } else {
+        await resendVerification(cleanTarget);
+      }
+      setInfo("کد جدید با موفقیت ارسال شد.");
+    } catch (err: any) {
+      setError(err?.response?.data?.message ?? "ارسال دوباره کد با خطا مواجه شد.");
+    } finally {
+      setResending(false);
+    }
+  };
+
+  return (
+    <div className="mx-auto flex max-w-sm flex-col gap-4 px-6 py-24">
+      <h1 className="text-2xl font-bold">
+        {channel === "phone" ? "تأیید شماره موبایل" : "تأیید ایمیل"}
+      </h1>
+      <p className="text-sm opacity-70">
+        کد ۶ رقمی ارسال‌شده به {channel === "phone" ? "پیامک" : "ایمیل"} خود را وارد کنید.
+      </p>
+
+      <form onSubmit={handleSubmit} className="flex flex-col gap-3">
+        <input
+          value={target}
+          onChange={(e) => setTarget(channel === "phone" ? toEnglishDigits(e.target.value) : e.target.value)}
+          placeholder={channel === "phone" ? "شماره موبایل" : "ایمیل"}
+          className="w-full rounded-lg px-4 py-3 text-center"
+          dir="ltr"
+          style={{ backgroundColor: "var(--surface)" }}
+        />
+        <input
+          value={code}
+          onChange={(e) => setCode(toEnglishDigits(e.target.value))}
+          placeholder="کد ۶ رقمی"
+          maxLength={6}
+          inputMode="numeric"
+          dir="ltr"
+          className="w-full rounded-lg px-4 py-3 text-center text-lg tracking-widest"
+          style={{ backgroundColor: "var(--surface)" }}
+        />
+
+        {info && <p className="text-sm" style={{ color: "var(--accent)" }}>{info}</p>}
+        {error && <p className="text-sm text-red-400">{error}</p>}
+
+        <button
+          type="submit"
+          disabled={submitting || !target || code.length !== 6}
+          className="mt-2 rounded-full py-3 font-semibold disabled:opacity-50"
+          style={{ backgroundColor: "var(--accent)", color: "var(--bg)" }}
+        >
+          {submitting ? "در حال بررسی..." : "تأیید و ادامه"}
+        </button>
+      </form>
+
+      <button
+        type="button"
+        onClick={handleResend}
+        disabled={resending || !target}
+        className="text-sm opacity-70 hover:opacity-100 disabled:opacity-40"
+      >
+        {resending ? "در حال ارسال..." : "ارسال مجدد کد"}
+      </button>
+
+      <p className="text-center text-sm opacity-70">
+        <Link to="/login" style={{ color: "var(--accent)" }}>
+          بازگشت به صفحه‌ی ورود
+        </Link>
+      </p>
+    </div>
+  );
+}

@@ -1,0 +1,30 @@
+import { z } from "zod";
+import { ResponseStage } from "@prisma/client";
+
+export const createResponseSchema = z.object({
+  questionId: z.string().uuid(),
+  content: z.string().min(1, "متن پاسخ نمی‌تواند خالی باشد.").max(5000),
+  stage: z.nativeEnum(ResponseStage),
+  bootcampId: z.string().uuid().optional(),
+});
+
+// Adding a new version never takes questionId — the response it's
+// versioning is identified by the :id route param, and the question
+// never changes for an existing response.
+export const addVersionSchema = z.object({
+  content: z.string().min(1, "متن پاسخ نمی‌تواند خالی باشد.").max(5000),
+  stage: z.nativeEnum(ResponseStage),
+  bootcampId: z.string().uuid().optional(),
+});
+
+export type CreateResponseInput = z.infer<typeof createResponseSchema>;
+export type AddVersionInput = z.infer<typeof addVersionSchema>;
+
+export const scoreSelfSchema = z.object({
+  score: z.number().int().min(0).max(100),
+});
+
+export const scoreReviewerSchema = z.object({
+  score: z.number().int().min(0).max(100),
+  feedback: z.string().optional(),
+});

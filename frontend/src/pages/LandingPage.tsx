@@ -1,0 +1,444 @@
+import React, { useRef, useEffect, useState } from "react";
+import { Link } from "react-router-dom";
+import { motion, useScroll, useTransform, useSpring } from "framer-motion";
+import axios from "axios";
+
+interface StepCard {
+  num?: string;
+  title: string;
+  desc: string;
+  icon?: string;
+  gradient?: string;
+}
+
+interface FeatureCard {
+  title: string;
+  body: string;
+  badge: string;
+  icon: string;
+}
+
+const DEFAULT_BRAND_PILLARS: StepCard[] = [
+  {
+    num: "۰۱",
+    title: "هویت و خودشناسی",
+    desc: "سنجش ۱۰۰ شاخصه کلیدی رفتاری، فن‌بیان و نحوه تصمیم‌گیری در شرایط واقعی.",
+    icon: "🧬",
+    gradient: "from-amber-500/20 to-orange-500/10",
+  },
+  {
+    num: "۰۲",
+    title: "کشف زاویه دید دیگران",
+    desc: "آینه ۳۶۰ درجه برای شفاف‌سازی تصویری که کارفرما، شبکه همکاران و اساتید از شما دارند.",
+    icon: "🪞",
+    gradient: "from-indigo-500/20 to-purple-500/10",
+  },
+  {
+    num: "۰۳",
+    title: "بازآفرینی و مهارت‌آموزی",
+    desc: "بوت‌کمپ‌های تخصصی، سناریونویسی پرزنت و منتورینگ اختصاصی با رهبران صنعت.",
+    icon: "⚡",
+    gradient: "from-cyan-500/20 to-blue-500/10",
+  },
+  {
+    num: "۰۴",
+    title: "ویترین ملی و اتصال",
+    desc: "معرفی به جشنواره کشوری، دریافت شناسنامه هویت حرفه‌ای و ورود به شبکه فرصت‌ها.",
+    icon: "🚀",
+    gradient: "from-emerald-500/20 to-teal-500/10",
+  },
+];
+
+const DEFAULT_PLATFORM_FEATURES: FeatureCard[] = [
+  {
+    title: "مسیر هوشمند برند شخصی",
+    body: "از خودشناسی تا معرفی عمومی در هشت فاز داده‌محور؛ با تحلیل ۴ سناریوی واقعی کاری، مصاحبه و سرمایه‌گذاری.",
+    badge: "ماتریس رفتار",
+    icon: "📊",
+  },
+  {
+    title: "ارزیابی ۳۶۰ درجه (My Mirror)",
+    body: "ترکیب ادراک فردی با بازخورد واقعی هم‌تیمی‌ها، منتورها و کارفرمایان جهت کشف نقاط کور اثرگذاری.",
+    badge: "بازخورد هوشمند",
+    icon: "🎯",
+  },
+  {
+    title: "شناسنامه عمومی و رتبه ملی",
+    body: "یک هویت آنلاین معتبر با لینک اختصاصی و تاییدیه داوران برای درخشش در بازار کار و اکوسیستم کارآفرینی.",
+    badge: "شناسنامه حرفه‌ای",
+    icon: "💎",
+  },
+];
+
+const GRADIENTS = [
+  "from-amber-500/20 to-orange-500/10",
+  "from-indigo-500/20 to-purple-500/10",
+  "from-cyan-500/20 to-blue-500/10",
+  "from-emerald-500/20 to-teal-500/10",
+  "from-rose-500/20 to-pink-500/10",
+  "from-violet-500/20 to-purple-500/10"
+];
+
+const NUM_LIST = ["۰۱", "۰۲", "۰۳", "۰۴", "۰۵", "۰۶", "۰۷", "۰۸"];
+
+export function LandingPage() {
+  const containerRef = useRef<HTMLDivElement>(null);
+  
+  const [stepsSection, setStepsSection] = useState<{ title: string; badge: string; items: StepCard[] }>({
+    title: "چگونه برند شخصی شما متمایز می‌شود؟",
+    badge: "مسیر چهارگانه پیشرفت",
+    items: DEFAULT_BRAND_PILLARS,
+  });
+
+  const [featuresSection, setFeaturesSection] = useState<{ title: string; badge: string; items: FeatureCard[] }>({
+    title: "ویژگی‌های اصلی پلتفرم",
+    badge: "امکانات پلتفرم",
+    items: DEFAULT_PLATFORM_FEATURES,
+  });
+
+  useEffect(() => {
+    const fetchLandingData = async () => {
+      try {
+        const res = await axios.get("/api/landing").catch(() => axios.get("/landing"));
+        if (res?.data?.success && res.data.data?.sections) {
+          const sections = res.data.data.sections;
+          
+          const sSec = sections.find((s: any) => s.id === "steps-section");
+          if (sSec && Array.isArray(sSec.items) && sSec.items.length > 0) {
+            setStepsSection({
+              title: sSec.title || "چگونه برند شخصی شما متمایز می‌شود؟",
+              badge: sSec.badge || "مسیر پیشرفت",
+              items: sSec.items.map((it: any, idx: number) => ({
+                num: it.num || NUM_LIST[idx % NUM_LIST.length],
+                title: it.title,
+                desc: it.desc || it.body || "",
+                icon: it.icon || "⚡",
+                gradient: GRADIENTS[idx % GRADIENTS.length]
+              }))
+            });
+          }
+
+          const fSec = sections.find((s: any) => s.id === "features-section");
+          if (fSec && Array.isArray(fSec.items) && fSec.items.length > 0) {
+            setFeaturesSection({
+              title: fSec.title || "ویژگی‌های اصلی پلتفرم",
+              badge: fSec.badge || "امکانات پلتفرم",
+              items: fSec.items.map((it: any) => ({
+                title: it.title,
+                body: it.body || it.desc || "",
+                badge: it.badge || "ویژگی",
+                icon: it.icon || "📊"
+              }))
+            });
+          }
+        }
+      } catch (err) {
+        // در صورت بروز خطا از مقادیر پیش‌فرض استفاده می‌شود
+      }
+    };
+    fetchLandingData();
+  }, []);
+
+  // رهگیری اسکرول کل صفحه
+  const { scrollYProgress } = useScroll({
+    target: containerRef,
+    offset: ["start start", "end end"],
+  });
+
+  const smoothProgress = useSpring(scrollYProgress, {
+    stiffness: 90,
+    damping: 24,
+    restDelta: 0.001,
+  });
+
+  // انیمیشن‌های چندلایه اسکرول برای المان‌ها و شعارها
+  const quote1X = useTransform(smoothProgress, [0, 0.45], [0, 90]);
+  const quote1Y = useTransform(smoothProgress, [0, 0.45], [0, 180]);
+  const quote1Rotate = useTransform(smoothProgress, [0, 0.45], [-6, 16]);
+
+  const quote2X = useTransform(smoothProgress, [0, 0.45], [0, -90]);
+  const quote2Y = useTransform(smoothProgress, [0, 0.45], [0, -140]);
+  const quote2Rotate = useTransform(smoothProgress, [0, 0.45], [5, -18]);
+
+  const dnaScale = useTransform(smoothProgress, [0, 0.4], [1, 0.88]);
+  const dnaRotate = useTransform(smoothProgress, [0, 0.4], [0, -8]);
+  const dnaY = useTransform(smoothProgress, [0, 0.4], [0, -80]);
+
+  const quote3Y = useTransform(smoothProgress, [0.15, 0.6], [60, -40]);
+  const quote3Opacity = useTransform(smoothProgress, [0.1, 0.25, 0.55, 0.7], [0, 1, 1, 0]);
+
+  const glowY = useTransform(smoothProgress, [0, 1], [0, 600]);
+
+  return (
+    <div
+      ref={containerRef}
+      className="relative min-h-screen text-slate-100 overflow-hidden font-sans selection:bg-amber-500 selection:text-black"
+    >
+      <motion.div
+        style={{ y: glowY }}
+        className="fixed -top-40 left-1/2 -translate-x-1/2 w-[900px] h-[500px] bg-gradient-to-b from-amber-500/20 via-indigo-600/15 to-transparent blur-[160px] pointer-events-none -z-10"
+      />
+      <div className="fixed top-[45%] -right-40 w-[450px] h-[450px] bg-purple-600/10 blur-[150px] pointer-events-none -z-10" />
+      <div className="fixed bottom-10 -left-40 w-[450px] h-[450px] bg-amber-500/10 blur-[150px] pointer-events-none -z-10" />
+
+      {/* ===================== HERO SECTION ===================== */}
+      <section className="relative mx-auto max-w-7xl px-6 pt-16 pb-20 md:pt-24 md:pb-28">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-8 items-center">
+          
+          <motion.div
+            initial={{ opacity: 0, x: 30 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.8, ease: "easeOut" }}
+            className="lg:col-span-7 text-center lg:text-right space-y-7 z-10"
+          >
+            <div className="inline-flex items-center gap-2.5 px-4 py-2 rounded-full border border-amber-500/30 bg-slate-900/80 backdrop-blur-xl shadow-[0_0_20px_rgba(245,158,11,0.15)]">
+              <span className="relative flex h-2.5 w-2.5">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
+                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-500" />
+              </span>
+              <span className="text-xs sm:text-sm font-semibold tracking-wide text-amber-300">
+                جشنواره سراسری برند شخصی دانشجویی
+              </span>
+            </div>
+
+            <h1 className="text-4xl sm:text-6xl lg:text-7xl font-black tracking-tight leading-[1.15]">
+              هویت تو، <br />
+              <span className="bg-gradient-to-r from-amber-200 via-amber-400 to-yellow-500 bg-clip-text text-transparent">
+                برند متمایز توست.
+              </span>
+            </h1>
+
+            <p className="text-lg sm:text-xl text-slate-300 font-light leading-relaxed max-w-2xl mx-auto lg:mx-0">
+              «آنچه هستی را بشناس؛ آنچه می‌خواهی باشی را بساز.»
+              <span className="block text-sm sm:text-base text-slate-400 mt-2 font-normal">
+                پلتفرمی بر پایه ارزیابی هوشمند، کشف ابعاد ناشناخته رفتار و ایجاد اعتبار پایدار در بازار کار و جامعه.
+              </span>
+            </p>
+
+            <div className="flex flex-wrap items-center justify-center lg:justify-start gap-4 pt-2">
+              <Link
+                to={Boolean(localStorage.getItem("token") || localStorage.getItem("auth_token")) ? "/dashboard" : "/register"}
+                className="group relative inline-flex items-center gap-2 px-8 py-4 rounded-2xl font-bold text-slate-950 transition-all duration-300 transform hover:-translate-y-1 active:translate-y-0 overflow-hidden shadow-[0_10px_35px_rgba(245,158,11,0.35)] hover:shadow-[0_15px_45px_rgba(245,158,11,0.5)]"
+                style={{ backgroundColor: "var(--accent, #f59e0b)" }}
+              >
+                <span>شروع مسیر ارزیابی</span>
+                <span className="transition-transform group-hover:translate-x-[-4px]">←</span>
+              </Link>
+              
+              <Link
+                to="/community"
+                className="px-6 py-4 rounded-2xl bg-slate-900/90 hover:bg-slate-800 text-slate-200 border border-slate-700/80 backdrop-blur-md font-medium transition-all duration-200 hover:border-slate-500 shadow-lg"
+              >
+                اعضای جشنواره
+              </Link>
+
+              <Link
+                to="/showcase"
+                className="px-6 py-4 rounded-2xl bg-slate-900/90 hover:bg-slate-800 text-slate-200 border border-slate-700/80 backdrop-blur-md font-medium transition-all duration-200 hover:border-slate-500 shadow-lg"
+              >
+                برترین‌های دوره
+              </Link>
+            </div>
+          </motion.div>
+
+          {/* ================= 3D STAGE & SCROLL MOTTO CARDS ================= */}
+          <div className="lg:col-span-5 relative flex items-center justify-center min-h-[440px] [perspective:1200px]">
+            
+            <motion.div
+              style={{
+                scale: dnaScale,
+                rotateZ: dnaRotate,
+                y: dnaY,
+              }}
+              className="relative w-full max-w-[360px] rounded-3xl bg-gradient-to-b from-slate-800/90 via-slate-900/95 to-slate-950/95 border border-slate-700/80 p-7 backdrop-blur-2xl shadow-[0_25px_60px_rgba(0,0,0,0.8)] z-20"
+            >
+              <div className="absolute inset-x-0 -top-px h-px bg-gradient-to-r from-transparent via-amber-400/80 to-transparent" />
+              
+              <div className="flex items-center justify-between pb-4 border-b border-slate-800">
+                <span className="flex items-center gap-1.5 text-amber-400 font-mono text-xs">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                  PERSONAL BRAND DNA
+                </span>
+                <span className="text-[10px] text-slate-400 font-mono">SCROLL TO EXPAND</span>
+              </div>
+
+              <div className="relative my-6 flex items-center justify-center">
+                <div className="absolute w-44 h-44 rounded-full border border-amber-500/20 border-dashed animate-[spin_25s_linear_infinite]" />
+                <div className="absolute w-32 h-32 rounded-full border border-indigo-500/30 animate-[spin_12s_linear_infinite_reverse]" />
+                
+                <div className="w-24 h-24 rounded-2xl bg-gradient-to-tr from-amber-500 via-amber-400 to-yellow-300 p-0.5 shadow-[0_0_35px_rgba(245,158,11,0.5)]">
+                  <div className="w-full h-full bg-slate-950 rounded-[14px] flex items-center justify-center">
+                    <svg className="w-12 h-12 text-amber-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 11c0 3.517-1.009 6.799-2.753 9.571m-3.44-2.04l.054-.09A13.916 13.916 0 008 11a4 4 0 118 0c0 1.017-.07 2.019-.203 3m-2.118 6.844A21.88 21.88 0 0015.171 17m3.839 1.132c.645-2.266.99-4.659.99-7.132A8 8 0 004 11m5.979-5.11a7.962 7.962 0 014.042-1.09" />
+                    </svg>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2.5 bg-slate-950/70 p-3 rounded-2xl border border-slate-800 text-center">
+                <div>
+                  <div className="text-[10px] text-slate-400">سنجش شخصیتی</div>
+                  <div className="text-sm font-bold text-white font-mono mt-0.5">۱۰۰ شاخصه</div>
+                </div>
+                <div className="border-r border-slate-800 pr-2">
+                  <div className="text-[10px] text-slate-400">ماتریس رفتار</div>
+                  <div className="text-sm font-bold text-amber-400 font-mono mt-0.5">۴ سناریو</div>
+                </div>
+              </div>
+            </motion.div>
+
+            <motion.div
+              style={{
+                x: quote1X,
+                y: quote1Y,
+                rotate: quote1Rotate,
+              }}
+              className="absolute -top-10 -right-4 sm:-right-10 max-w-[260px] bg-slate-900/95 border border-amber-500/40 rounded-2xl p-4 shadow-[0_15px_35px_rgba(0,0,0,0.6)] backdrop-blur-xl z-30 pointer-events-none"
+            >
+              <div className="flex items-center gap-2 mb-1.5 text-amber-400 text-xs font-bold">
+                <span>⚡</span>
+                <span>قانون اول برندینگ</span>
+              </div>
+              <p className="text-xs font-medium text-slate-200 leading-relaxed text-right">
+                «اگر خودت برندت را تعریف نکنی، بازار بر اساس قضاوت دیگران برایت تصمیم می‌گیرد.»
+              </p>
+            </motion.div>
+
+            <motion.div
+              style={{
+                x: quote2X,
+                y: quote2Y,
+                rotate: quote2Rotate,
+              }}
+              className="absolute -bottom-10 -left-4 sm:-left-10 max-w-[270px] bg-slate-900/95 border border-indigo-500/40 rounded-2xl p-4 shadow-[0_15px_35px_rgba(0,0,0,0.6)] backdrop-blur-xl z-30 pointer-events-none"
+            >
+              <div className="flex items-center gap-2 mb-1.5 text-indigo-400 text-xs font-bold">
+                <span>🎯</span>
+                <span>اثرگذاری واقعی</span>
+              </div>
+              <p className="text-xs font-medium text-slate-200 leading-relaxed text-right">
+                «تخصص بالا بدون ووضوح و اعتبار، فرصت شغلی و اثرگذاری خلق نمی‌کند.»
+              </p>
+            </motion.div>
+
+          </div>
+
+        </div>
+      </section>
+
+      {/* ===================== کارت شناور میانی ===================== */}
+      <div className="max-w-4xl mx-auto px-6 mb-12">
+        <motion.div
+          style={{ y: quote3Y, opacity: quote3Opacity }}
+          className="rounded-2xl border border-amber-500/30 bg-gradient-to-r from-amber-500/10 via-slate-900/90 to-indigo-500/10 p-4 sm:p-5 backdrop-blur-xl text-center shadow-2xl"
+        >
+          <span className="text-amber-400 font-bold text-sm block mb-1">💡 ارزش پایدار برند شخصی</span>
+          <p className="text-xs sm:text-sm text-slate-200 font-medium">
+            «رزومه فقط می‌گوید در گذشته چه کرده‌اید؛ اما برند شخصی به جهان نشان می‌دهد در آینده قادر به خلق چه ارزش‌هایی هستید.»
+          </p>
+        </motion.div>
+      </div>
+
+      {/* ===================== JOURNEY STAGES (داینامیک شده از ادمین) ===================== */}
+      <section className="relative mx-auto max-w-6xl px-6 pb-24">
+        <div className="text-center max-w-xl mx-auto mb-12">
+          <motion.h3
+            initial={{ opacity: 0, y: 15 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            className="text-xs font-mono uppercase tracking-widest text-amber-400"
+          >
+            {stepsSection.badge}
+          </motion.h3>
+          <motion.h2
+            initial={{ opacity: 0, y: 15 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ delay: 0.1 }}
+            className="text-2xl sm:text-3xl font-extrabold text-white mt-1.5"
+          >
+            {stepsSection.title}
+          </motion.h2>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          {stepsSection.items.map((step, idx) => (
+            <motion.div
+              key={idx}
+              initial={{ opacity: 0, y: 40, rotateX: 15 }}
+              whileInView={{ opacity: 1, y: 0, rotateX: 0 }}
+              viewport={{ once: true, margin: "-50px" }}
+              transition={{ duration: 0.6, delay: idx * 0.12, ease: "easeOut" }}
+              whileHover={{ y: -8, scale: 1.02, transition: { duration: 0.2 } }}
+              className={`relative rounded-3xl bg-gradient-to-b ${step.gradient || 'from-amber-500/20 to-orange-500/10'} to-slate-950/90 border border-slate-800/90 p-6 backdrop-blur-xl group hover:border-amber-500/40 transition-all shadow-xl`}
+            >
+              <div className="flex items-center justify-between mb-4">
+                <span className="text-2xl p-2.5 rounded-2xl bg-slate-900/90 border border-slate-700/60 shadow-inner">
+                  {step.icon || "⚡"}
+                </span>
+                <span className="font-mono text-xs font-bold text-amber-400/90 bg-amber-500/10 px-2.5 py-1 rounded-full border border-amber-500/20">
+                  {step.num || NUM_LIST[idx % NUM_LIST.length]}
+                </span>
+              </div>
+              <h4 className="text-lg font-bold text-white group-hover:text-amber-300 transition-colors">
+                {step.title}
+              </h4>
+              <p className="text-xs text-slate-300 mt-2.5 leading-relaxed">
+                {step.desc}
+              </p>
+            </motion.div>
+          ))}
+        </div>
+      </section>
+
+      {/* ===================== PLATFORM FEATURES BENTO (داینامیک شده از ادمین) ===================== */}
+      <section className="relative mx-auto max-w-6xl px-6 pb-28">
+        <div className="text-center max-w-xl mx-auto mb-10">
+          <motion.h3
+            initial={{ opacity: 0, y: 15 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            className="text-xs font-mono uppercase tracking-widest text-amber-400"
+          >
+            {featuresSection.badge}
+          </motion.h3>
+          <motion.h2
+            initial={{ opacity: 0, y: 15 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ delay: 0.1 }}
+            className="text-2xl sm:text-3xl font-extrabold text-white mt-1.5"
+          >
+            {featuresSection.title}
+          </motion.h2>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {featuresSection.items.map((f, i) => (
+            <motion.div
+              key={f.title + i}
+              initial={{ opacity: 0, y: 35 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.6, delay: i * 0.15 }}
+              whileHover={{ y: -6 }}
+              className="relative rounded-3xl bg-gradient-to-b from-slate-900/85 to-slate-950/95 border border-slate-800/80 p-7 backdrop-blur-xl hover:border-amber-500/40 transition-all shadow-2xl group"
+            >
+              <div className="flex items-center justify-between mb-5">
+                <span className="text-3xl">{f.icon || "📊"}</span>
+                <span className="text-[11px] font-mono text-amber-400 px-3 py-1 rounded-full bg-slate-800 border border-slate-700">
+                  {f.badge || "ویژگی"}
+                </span>
+              </div>
+              <h3 className="text-xl font-bold text-white group-hover:text-amber-300 transition-colors">
+                {f.title}
+              </h3>
+              <p className="mt-3 text-sm leading-relaxed text-slate-300">{f.body}</p>
+            </motion.div>
+          ))}
+        </div>
+      </section>
+
+    </div>
+  );
+}

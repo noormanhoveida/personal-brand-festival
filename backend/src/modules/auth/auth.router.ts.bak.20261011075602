@@ -1,0 +1,36 @@
+import { Router } from "express";
+import { validate } from "../../middleware/validate";
+import {
+  register,
+  login,
+  verifyEmail,
+  verifyPhone,
+  resendVerification,
+  resendPhoneVerification,
+  refresh,
+  logout,
+  me,
+} from "./auth.controller";
+import {
+  registerSchema,
+  loginSchema,
+  verifyEmailSchema,
+  verifyPhoneSchema,
+  resendVerificationSchema,
+  resendPhoneVerificationSchema,
+} from "./auth.validator";
+import { requireAuth } from "../../middleware/auth";
+
+const router = Router();
+
+router.post("/register", validate(registerSchema), register);
+router.post("/login", validate(loginSchema), login);
+router.post("/verify-email", validate(verifyEmailSchema), verifyEmail);
+router.post("/verify-phone", validate(verifyPhoneSchema), verifyPhone);
+router.post("/resend-verification", validate(resendVerificationSchema), resendVerification);
+router.post("/resend-phone-verification", validate(resendPhoneVerificationSchema), resendPhoneVerification);
+router.post("/refresh", refresh);
+router.post("/logout", logout);
+router.get("/me", requireAuth, me);
+
+export default router;

@@ -1,0 +1,456 @@
+import { prisma } from "../../config/db";
+import { ArtifactInput } from "./artifact.validator";
+import { ArtifactMediaType, ArtifactStatus } from "@prisma/client";
+import fs from "fs";
+import path from "path";
+
+const GUIDE_FILE_PATH = path.join(process.cwd(), "artifact-guide.json");
+
+export class ArtifactService {
+  async getGuide() {
+    try {
+      if (fs.existsSync(GUIDE_FILE_PATH)) {
+        const content = fs.readFileSync(GUIDE_FILE_PATH, "utf-8");
+        return JSON.parse(content);
+      }
+    } catch (e) {
+      console.error("Failed to read artifact guide file:", e);
+    }
+    return { axes: [] };
+  }
+
+  async updateGuide(data: any) {
+    fs.writeFileSync(GUIDE_FILE_PATH, JSON.stringify(data, null, 2), "utf-8");
+    return data;
+  }
+
+  async addComment(userId: string, artifactId: string, content: string, parentId?: string) {
+    return prisma.artifactComment.create({
+      data: {
+        userId,
+        artifactId,
+        content,
+        parentId: parentId || null
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            participantProfile: {
+              select: { firstName: true, lastName: true, slug: true }
+            }
+          }
+        }
+      }
+    });
+  }
+
+  async reactToComment(commentId: string, userId: string, action: "LIKE" | "DISLIKE") {
+    const comment = await prisma.artifactComment.findUnique({ where: { id: commentId } });
+    if (!comment) throw new Error("نظر یافت نشد");
+
+    let likes = [...(comment.likedUserIds || [])];
+    let dislikes = [...(comment.dislikedUserIds || [])];
+
+    if (action === "LIKE") {
+      if (likes.includes(userId)) {
+        likes = likes.filter(id => id !== userId);
+      } else {
+        likes.push(userId);
+        dislikes = dislikes.filter(id => id !== userId);
+      }
+    } else if (action === "DISLIKE") {
+      if (dislikes.includes(userId)) {
+        dislikes = dislikes.filter(id => id !== userId);
+      } else {
+        dislikes.push(userId);
+        likes = likes.filter(id => id !== userId);
+      }
+    }
+
+    return prisma.artifactComment.update({
+      where: { id: commentId },
+      data: { likedUserIds: likes, dislikedUserIds: dislikes }
+    });
+  }
+
+  async getCommentsByArtifactId(artifactId: string) {
+    const comments = await prisma.artifactComment.findMany({
+      where: { artifactId },
+      include: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+            role: true,
+            participantProfile: {
+              select: {
+                firstName: true,
+                lastName: true
+              }
+            }
+          }
+        }
+      },
+      orderBy: { createdAt: "desc" }
+    });
+
+    return comments.map((c: any) => {
+      const p = c.user?.participantProfile;
+      const fullName = (p?.firstName || p?.lastName)
+        ? `${p.firstName || ""} ${p.lastName || ""}`.trim()
+        : (c.user?.email ? c.user.email.split("@")[0] : "کاربر سامانه");
+
+      return {
+        id: c.id,
+        artifactId: c.artifactId,
+        userId: c.userId,
+        content: c.content,
+        parentId: c.parentId || null,
+        likedUserIds: c.likedUserIds || [],
+        dislikedUserIds: c.dislikedUserIds || [],
+        createdAt: c.createdAt,
+        updatedAt: c.updatedAt,
+        user: {
+          id: c.user?.id || c.userId,
+          name: fullName,
+          avatar: null,
+          role: c.user?.role || "USER"
+        }
+      };
+    });
+  }
+
+  async getPublicArtifactsBySlug(slug: string) {
+    const participant = await prisma.participantProfile.findUnique({
+      where: { slug },
+      include: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+          },
+        },
+      },
+    });
+
+    if (!participant) {
+      throw new Error("پروفایل یافت نشد");
+    }
+
+    const artifacts = await prisma.artifact.findMany({
+      where: {
+        participantId: participant.id,
+        status: "APPROVED",
+      },
+      include: {
+        ratings: { select: { score: true } },
+        comments: {
+          orderBy: { createdAt: "desc" },
+          include: {
+            user: {
+              select: {
+                id: true,
+                email: true,
+                participantProfile: {
+                  select: {
+                    firstName: true,
+                    lastName: true,
+                    slug: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+
+    return {
+      participant: {
+        fullName: `${participant.firstName} ${participant.lastName}`.trim(),
+        firstName: participant.firstName,
+        lastName: participant.lastName,
+        slug: participant.slug,
+        professionalField: participant.professionalField,
+        bio: participant.bio,
+      },
+      artifacts,
+    };
+  }
+
+  async getMyArtifacts(userId: string) {
+    if (!userId) {
+      return [];
+    }
+    const participant = await prisma.participantProfile.findUnique({
+      where: { userId },
+    });
+
+    if (!participant) {
+      return [];
+    }
+
+    return prisma.artifact.findMany({
+      where: { participantId: participant.id },
+      include: {
+        ratings: { select: { score: true } },
+        comments: {
+          orderBy: { createdAt: "desc" },
+          include: {
+            user: {
+              select: {
+                id: true,
+                email: true,
+                participantProfile: {
+                  select: {
+                    firstName: true,
+                    lastName: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+  }
+
+  async createArtifact(userId: string, data: ArtifactInput) {
+    if (!userId) {
+      throw new Error("شناسه کاربر معتبر نیست. لطفاً مجدداً وارد حساب کاربری خود شوید.");
+    }
+    const participant = await prisma.participantProfile.findUnique({
+      where: { userId },
+    });
+
+    if (!participant) {
+      throw new Error("پروفایل مشارکت‌کننده یافت نشد");
+    }
+
+    return prisma.artifact.create({
+      data: {
+        participantId: participant.id,
+        axis: data.axis,
+        templateTitle: data.templateTitle,
+        title: data.title,
+        description: data.description ?? null,
+        mediaType: data.mediaType as ArtifactMediaType,
+        mediaUrl: data.mediaUrl,
+        coverImageUrl: data.coverImageUrl ?? null,
+        status: "PENDING",
+      },
+    });
+  }
+
+  async deleteArtifact(userId: string, artifactId: string, isAdmin: boolean) {
+    const artifact = await prisma.artifact.findUnique({
+      where: { id: artifactId },
+      include: { participant: true },
+    });
+
+    if (!artifact) {
+      throw new Error("اثر یافت نشد");
+    }
+
+    if (!isAdmin && artifact.participant.userId !== userId) {
+      throw new Error("شما اجازه حذف این اثر را ندارید");
+    }
+
+    return prisma.artifact.delete({
+      where: { id: artifactId },
+    });
+  }
+
+  async rateArtifact(userId: string, artifactId: string, score: number) {
+    const artifact = await prisma.artifact.findUnique({
+      where: { id: artifactId },
+      include: { participant: true },
+    });
+
+    if (!artifact) {
+      throw new Error("اثر یافت نشد");
+    }
+
+    if (artifact.participant.userId === userId) {
+      throw new Error("شما نمی‌توانید به اثر خود امتیاز دهید");
+    }
+
+    await prisma.artifactRating.upsert({
+      where: {
+        artifactId_userId: { artifactId, userId },
+      },
+      update: { score },
+      create: { artifactId, userId, score },
+    });
+
+    const aggregates = await prisma.artifactRating.aggregate({
+      where: { artifactId },
+      _avg: { score: true },
+      _count: { score: true },
+    });
+
+    const averageRating = aggregates._avg.score || 0;
+    const ratingsCount = aggregates._count.score || 0;
+
+    await prisma.artifact.update({
+      where: { id: artifactId },
+      data: {
+        averageRating,
+        ratingsCount,
+      },
+    });
+
+    return { averageRating, ratingsCount };
+  }
+
+  async getAdminArtifacts(status?: string) {
+    return prisma.artifact.findMany({
+      where: status ? { status: status as ArtifactStatus } : undefined,
+      include: {
+        
+        participant: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            mobile: true,
+            user: {
+              select: {
+                id: true,
+                email: true,
+              },
+            },
+          },
+        },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+  }
+
+  async reviewArtifact(artifactId: string, status: string, adminNote?: string | null) {
+    return prisma.artifact.update({
+      where: { id: artifactId },
+      data: {
+        status: status as ArtifactStatus,
+        adminNote: adminNote ?? null,
+      },
+    });
+  }
+
+  async getApprovedArtifacts(take = 12) {
+    return prisma.artifact.findMany({
+      where: { status: "APPROVED" },
+      orderBy: { createdAt: "desc" },
+      take: Number(take) || 12,
+      include: {
+        
+        ratings: true,
+        participant: {
+          select: {
+            slug: true,
+            firstName: true,
+            lastName: true,
+            user: {
+              select: {
+                email: true,
+              },
+            },
+          },
+        },
+        ratings: {
+          select: { score: true },
+        },
+        },
+      },
+    });
+  }
+
+  async getArtifactById(id: string) {
+    const item = await prisma.artifact.findUnique({
+      where: { id },
+      include: {
+        participant: true,
+        comments: {
+          include: {
+            user: {
+              include: {
+                participantProfile: true
+              }
+            }
+          },
+          orderBy: { createdAt: "desc" }
+        }
+      }
+    });
+
+    if (!item) return null;
+
+    const p = item.participant as any;
+    const authorName = p?.firstName && p?.lastName 
+      ? `${p.firstName} ${p.lastName}` 
+      : (p?.fullName || p?.title || "شرکت‌کننده جشنواره");
+
+    return {
+      ...item,
+      user: {
+        id: p?.userId || item.participantId,
+        name: authorName,
+        avatarUrl: null,
+        role: "PARTICIPANT"
+      },
+      comments: (item.comments || []).map((c: any) => {
+        const cp = c.user?.participantProfile;
+        const commentAuthor = cp?.firstName && cp?.lastName 
+          ? `${cp.firstName} ${cp.lastName}` 
+          : (cp?.fullName || "کاربر");
+        return {
+          id: c.id,
+          content: c.content,
+          createdAt: c.createdAt,
+          user: {
+            id: c.user?.id || c.userId,
+            name: commentAuthor,
+            avatarUrl: null
+          }
+        };
+      })
+    };
+  }
+
+  async editComment(commentId: string, userId: string, content: string) {
+    const comment = await prisma.artifactComment.findUnique({ where: { id: commentId } });
+    if (!comment) throw new Error("نظر یافت نشد");
+    if (comment.userId !== userId) throw new Error("شما اجازه ویرایش این نظر را ندارید");
+    return prisma.artifactComment.update({
+      where: { id: commentId },
+      data: { content },
+      include: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+            role: true,
+            participantProfile: { select: { firstName: true, lastName: true, slug: true } }
+          }
+        }
+      }
+    });
+  }
+
+  async deleteComment(commentId: string, userId: string, userRole?: string) {
+    const comment = await prisma.artifactComment.findUnique({ where: { id: commentId } });
+    if (!comment) throw new Error("نظر یافت نشد");
+    const isAdmin = userRole === "ADMIN";
+    if (comment.userId !== userId && !isAdmin) {
+      throw new Error("شما اجازه حذف این نظر را ندارید");
+    }
+    // ابتدا حذف فرزندان (پاسخ‌ها)
+    await prisma.artifactComment.deleteMany({ where: { parentId: commentId } });
+    return prisma.artifactComment.delete({ where: { id: commentId } });
+  }
+
+}
+export const artifactService = new ArtifactService();

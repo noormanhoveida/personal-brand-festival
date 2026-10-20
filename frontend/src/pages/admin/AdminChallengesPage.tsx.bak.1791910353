@@ -1,0 +1,138 @@
+import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
+import {
+  ChallengeInput,
+  createChallenge,
+  deleteChallenge,
+  listChallenges,
+  updateChallenge,
+  WeeklyChallenge,
+} from "../../api/challenges";
+import { Button, Card, ErrorText, Input, LoadError, Spinner, Textarea } from "../../components/ui";
+
+const emptyInput: ChallengeInput = { title: "", description: "", instructorName: "", instructorEmail: "" };
+
+export function AdminChallengesPage() {
+  const [challenges, setChallenges] = useState<WeeklyChallenge[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [creating, setCreating] = useState(false);
+  const [form, setForm] = useState<ChallengeInput>(emptyInput);
+
+  const load = () => {
+    setError(null);
+    listChallenges()
+      .then(setChallenges)
+      .catch(() => setError("بارگذاری چالش‌ها با خطا مواجه شد."));
+  };
+
+  useEffect(load, []);
+
+  const handleCreate = async () => {
+    if (!form.title.trim() || !form.description.trim()) return;
+    try {
+      await createChallenge(form);
+      setForm(emptyInput);
+      setCreating(false);
+      load();
+    } catch {
+      setError("ساخت چالش با خطا مواجه شد.");
+    }
+  };
+
+  const toggleActive = async (c: WeeklyChallenge) => {
+    try {
+      await updateChallenge(c.id, { isActive: !c.isActive });
+      load();
+    } catch {
+      setError("تغییر وضعیت چالش با خطا مواجه شد.");
+    }
+  };
+
+  const remove = async (c: WeeklyChallenge) => {
+    if (!confirm(`چالش «${c.title}» حذف شود؟`)) return;
+    try {
+      await deleteChallenge(c.id);
+      load();
+    } catch {
+      setError("این چالش پاسخ ثبت‌شده دارد و قابل حذف نیست — به‌جای حذف، غیرفعالش کن.");
+    }
+  };
+
+  if (error && !challenges) return <LoadError message={error} onRetry={load} />;
+  if (!challenges) {
+    return (
+      <div className="flex justify-center py-16">
+        <Spinner />
+      </div>
+    );
+  }
+
+  return (
+    <div className="mx-auto max-w-2xl">
+      <h1 className="text-2xl font-bold">چالش‌های هفتگی</h1>
+
+      {challenges.map((c) => (
+        <Card key={c.id} className="mt-4">
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="font-medium">
+                {c.title} {!c.isActive && <span className="text-xs opacity-50">(غیرفعال)</span>}
+              </p>
+              <p className="mt-1 text-sm opacity-70">{c.description}</p>
+              {c.instructorEmail && <p className="mt-1 text-xs opacity-50">مربی: {c.instructorName} ({c.instructorEmail})</p>}
+            </div>
+            <div className="flex shrink-0 flex-col items-end gap-1">
+              <Link to={`/dashboard/challenge-review/${c.id}`} className="text-xs" style={{ color: "var(--accent)" }}>
+                مشاهده‌ی پاسخ‌ها ←
+              </Link>
+              <button className="text-xs opacity-70 hover:opacity-100" onClick={() => toggleActive(c)}>
+                {c.isActive ? "غیرفعال کردن" : "فعال کردن"}
+              </button>
+              <button className="text-xs opacity-70 hover:opacity-100" onClick={() => remove(c)}>
+                حذف
+              </button>
+            </div>
+          </div>
+        </Card>
+      ))}
+
+      {creating ? (
+        <Card className="mt-4 space-y-2">
+          <Input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="عنوان چالش" />
+          <Textarea
+            rows={3}
+            value={form.description}
+            onChange={(e) => setForm({ ...form, description: e.target.value })}
+            placeholder="توضیح چالش"
+          />
+          <Input
+            value={form.instructorName}
+            onChange={(e) => setForm({ ...form, instructorName: e.target.value })}
+            placeholder="نام مربی/مدرس (اختیاری)"
+          />
+          <Input
+            value={form.instructorEmail}
+            onChange={(e) => setForm({ ...form, instructorEmail: e.target.value })}
+            placeholder="ایمیل مربی/مدرس (اختیاری)"
+          />
+          <Input
+            type="date"
+            value={form.deadline ?? ""}
+            onChange={(e) => setForm({ ...form, deadline: e.target.value })}
+          />
+          <div className="flex gap-2">
+            <Button onClick={handleCreate}>ساخت چالش</Button>
+            <Button variant="ghost" onClick={() => setCreating(false)}>
+              انصراف
+            </Button>
+          </div>
+        </Card>
+      ) : (
+        <Button className="mt-4" variant="ghost" onClick={() => setCreating(true)}>
+          + چالش جدید
+        </Button>
+      )}
+      <ErrorText>{error}</ErrorText>
+    </div>
+  );
+}

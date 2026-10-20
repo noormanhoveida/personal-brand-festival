@@ -1,0 +1,147 @@
+import { FormattedContent } from "../../components/FormattedContent";
+import { useEffect, useState } from "react";
+import {
+  PendingResponseVersion,
+  PendingTaskSubmission,
+  decideResponseVersion,
+  decideTaskSubmission,
+  listPendingApprovals,
+} from "../../api/approval";
+import { parseMultiChoice } from "../../components/QuestionBlock";
+import { Button, Card, Spinner } from "../../components/ui";
+
+export function ApprovalQueuePage() {
+  const [responseVersions, setResponseVersions] = useState<PendingResponseVersion[] | null>(null);
+  const [taskSubmissions, setTaskSubmissions] = useState<PendingTaskSubmission[] | null>(null);
+  const [busyId, setBusyId] = useState<string | null>(null);
+
+  const reload = () => {
+    listPendingApprovals().then(({ responseVersions, taskSubmissions }) => {
+      setResponseVersions(responseVersions);
+      setTaskSubmissions(taskSubmissions);
+    });
+  };
+
+  useEffect(reload, []);
+
+  const handleResponseDecision = async (id: string, status: "APPROVED" | "REJECTED") => {
+    setBusyId(id);
+    try {
+      await decideResponseVersion(id, status);
+      reload();
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const handleTaskDecision = async (id: string, status: "APPROVED" | "REJECTED") => {
+    setBusyId(id);
+    try {
+      await decideTaskSubmission(id, status);
+      reload();
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  if (!responseVersions || !taskSubmissions) {
+    return (
+      <div className="flex justify-center py-16">
+        <Spinner />
+      </div>
+    );
+  }
+
+  const totalPending = responseVersions.length + taskSubmissions.length;
+
+  return (
+    <div className="mx-auto max-w-2xl">
+      <h1 className="text-2xl font-bold">تأیید پاسخ‌ها</h1>
+      <p className="mt-1 text-sm opacity-70">
+        هر شرکت‌کننده برای هر ورودی که وارد می‌کند، یک امتیاز بالقوه می‌گیرد — ولی این
+        امتیاز فقط بعد از تأیید سلامت شما به‌عنوان ارزیاب قطعی می‌شود.
+      </p>
+
+      {totalPending === 0 && (
+        <p className="mt-6 text-sm opacity-60">هیچ موردی در انتظار تأیید نیست ✓</p>
+      )}
+
+      {responseVersions.length > 0 && (
+        <>
+          <h2 className="mt-6 text-lg font-semibold">پاسخ‌ها</h2>
+          <div className="mt-3 space-y-3">
+            {responseVersions.map((v) => (
+              <Card key={v.id}>
+                <div className="flex items-center justify-between text-xs opacity-60">
+                  <span>
+                    {v.response.participant.firstName} {v.response.participant.lastName}
+                  </span>
+                  <span>{new Date(v.createdAt).toLocaleDateString("fa-IR")}</span>
+                </div>
+                <div className="mt-1 text-sm font-medium"><FormattedContent content={v.response.question.text} /></div>
+                {v.response.question.inputType === "PHOTO" ? (
+                  <img src={v.content} alt="" className="mt-2 h-32 w-full rounded-lg object-cover" />
+                ) : v.response.question.inputType === "TRAIT_TAG" || v.response.question.inputType === "SINGLE_CHOICE" ? (
+                  <div className="mt-2 flex items-center gap-2">
+                    <span className="rounded-full px-3 py-1 text-sm" style={{ backgroundColor: "var(--surface)" }}>
+                      {v.content}
+                    </span>
+                    {v.autoScore != null && (
+                      <span className="text-xs opacity-60">امتیاز خودکار: {v.autoScore}</span>
+                    )}
+                  </div>
+                ) : v.response.question.inputType === "MULTI_CHOICE" ? (
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {parseMultiChoice(v.content).map((opt) => (
+                      <span key={opt} className="rounded-full px-3 py-1 text-sm" style={{ backgroundColor: "var(--surface)" }}>
+                        {opt}
+                      </span>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="mt-2 text-sm opacity-80">{v.content}</p>
+                )}
+                <div className="mt-3 flex gap-2">
+                  <Button onClick={() => handleResponseDecision(v.id, "APPROVED")} disabled={busyId === v.id}>
+                    تأیید
+                  </Button>
+                  <Button variant="ghost" onClick={() => handleResponseDecision(v.id, "REJECTED")} disabled={busyId === v.id}>
+                    رد
+                  </Button>
+                </div>
+              </Card>
+            ))}
+          </div>
+        </>
+      )}
+
+      {taskSubmissions.length > 0 && (
+        <>
+          <h2 className="mt-8 text-lg font-semibold">تکالیف</h2>
+          <div className="mt-3 space-y-3">
+            {taskSubmissions.map((s) => (
+              <Card key={s.id}>
+                <div className="flex items-center justify-between text-xs opacity-60">
+                  <span>
+                    {s.participant.firstName} {s.participant.lastName}
+                  </span>
+                  <span>{new Date(s.createdAt).toLocaleDateString("fa-IR")}</span>
+                </div>
+                <p className="mt-1 text-sm font-medium">{s.task.title}</p>
+                <p className="mt-2 text-sm opacity-80">{s.content}</p>
+                <div className="mt-3 flex gap-2">
+                  <Button onClick={() => handleTaskDecision(s.id, "APPROVED")} disabled={busyId === s.id}>
+                    تأیید
+                  </Button>
+                  <Button variant="ghost" onClick={() => handleTaskDecision(s.id, "REJECTED")} disabled={busyId === s.id}>
+                    رد
+                  </Button>
+                </div>
+              </Card>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}

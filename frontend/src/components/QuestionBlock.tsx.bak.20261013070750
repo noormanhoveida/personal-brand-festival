@@ -1,0 +1,313 @@
+import { useEffect, useRef, useState } from "react";
+import { ResponseWithVersions, addResponseVersion, createResponse } from "../api/responses";
+import { uploadMedia } from "../api/media";
+import { SituationalTrait, listTraitsForSituation } from "../api/traits";
+import { Button, Card, Input, Textarea } from "./ui";
+
+const STAGE_LABEL: Record<string, string> = {
+  BEFORE: "قبل",
+  AFTER: "بعد",
+  REVISION: "بازبینی",
+};
+
+/** MULTI_CHOICE answers are stored as a JSON-stringified array of the
+ * selected option labels — parsed defensively since old/malformed
+ * content should never crash rendering. */
+export function parseMultiChoice(content: string): string[] {
+  try {
+    const parsed = JSON.parse(content);
+    return Array.isArray(parsed) ? parsed : [content];
+  } catch {
+    return [content];
+  }
+}
+
+type InputType = "TEXT" | "LINK" | "PHOTO" | "TRAIT_TAG" | "SINGLE_CHOICE" | "MULTI_CHOICE";
+
+export function QuestionBlock({
+  question,
+  existingResponse,
+  onSaved,
+}: {
+  question: {
+    id: string;
+    text: string;
+    stage: string;
+    inputType?: InputType;
+    situationId?: string | null;
+    options?: string[];
+  };
+  existingResponse?: ResponseWithVersions;
+  onSaved: () => void;
+}) {
+  const [draft, setDraft] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [traits, setTraits] = useState<SituationalTrait[] | null>(null);
+  const [traitsError, setTraitsError] = useState(false);
+  const [multiSelection, setMultiSelection] = useState<string[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const stage = (question.stage as "BEFORE" | "AFTER" | "REVISION") ?? "BEFORE";
+  const inputType = question.inputType ?? "TEXT";
+
+  useEffect(() => {
+    if (inputType === "TRAIT_TAG" && question.situationId) {
+      listTraitsForSituation(question.situationId)
+        .then(setTraits)
+        .catch(() => setTraitsError(true));
+    }
+  }, [inputType, question.situationId]);
+
+  useEffect(() => {
+    if (inputType === "MULTI_CHOICE") {
+      const latest = existingResponse?.versions[existingResponse.versions.length - 1]?.content;
+      setMultiSelection(latest ? parseMultiChoice(latest) : []);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [inputType, existingResponse?.id]);
+
+  const saveContent = async (content: string) => {
+    setSaving(true);
+    setError(null);
+    try {
+      if (existingResponse) {
+        await addResponseVersion(existingResponse.id, { content, stage });
+      } else {
+        await createResponse({ questionId: question.id, content, stage });
+      }
+      setDraft("");
+      onSaved();
+    } catch {
+      setError("ثبت پاسخ با خطا مواجه شد.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const submitText = () => {
+    if (!draft.trim()) return;
+    saveContent(draft.trim());
+  };
+
+  const handlePhotoSelect = async (file: File) => {
+    setSaving(true);
+    setError(null);
+    try {
+      const media = await uploadMedia(file, "GALLERY");
+      await saveContent(media.url);
+    } catch {
+      setError("آپلود عکس با خطا مواجه شد.");
+      setSaving(false);
+    }
+  };
+
+  const latestContent = existingResponse?.versions[existingResponse.versions.length - 1]?.content;
+
+  return (
+    <Card>
+      <div className="flex items-center justify-between">
+        <p className="font-medium">{question.text}</p>
+        <span
+          className="rounded-full px-2 py-0.5 text-xs"
+          style={{ backgroundColor: "var(--surface)" }}
+        >
+          {STAGE_LABEL[stage] ?? stage}
+        </span>
+      </div>
+
+      {/* Full version history — old answers are never overwritten, only shown alongside new ones. */}
+      {existingResponse && existingResponse.versions.length > 0 && (
+        <div className="mt-4 space-y-3 border-t pt-4" style={{ borderColor: "var(--surface)" }}>
+          {existingResponse.versions.map((v) => (
+            <div key={v.id} className="rounded-lg p-3" style={{ backgroundColor: "var(--surface)" }}>
+              <div className="flex justify-between text-xs opacity-60">
+                <span>نسخه {v.versionNumber} — {STAGE_LABEL[v.stage] ?? v.stage}</span>
+                <span>{new Date(v.createdAt).toLocaleDateString("fa-IR")}</span>
+              </div>
+              {inputType === "PHOTO" ? (
+                <img src={v.content} alt="" className="mt-2 h-32 w-full rounded-lg object-cover" />
+              ) : inputType === "LINK" ? (
+                <a href={v.content} target="_blank" rel="noreferrer" className="mt-1 block text-sm underline" style={{ color: "var(--accent)" }}>
+                  {v.content}
+                </a>
+              ) : inputType === "TRAIT_TAG" || inputType === "SINGLE_CHOICE" ? (
+                <div className="mt-1 flex items-center gap-2">
+                  <span
+                    className="rounded-full px-3 py-1 text-sm"
+                    style={{ backgroundColor: "var(--accent)", color: "var(--bg)" }}
+                  >
+                    {v.content}
+                  </span>
+                  {v.autoScore != null && (
+                    <span className="text-xs opacity-60">امتیاز خودکار: {v.autoScore}</span>
+                  )}
+                </div>
+              ) : inputType === "MULTI_CHOICE" ? (
+                <div className="mt-1 flex flex-wrap gap-1.5">
+                  {parseMultiChoice(v.content).map((opt) => (
+                    <span
+                      key={opt}
+                      className="rounded-full px-3 py-1 text-sm"
+                      style={{ backgroundColor: "var(--accent)", color: "var(--bg)" }}
+                    >
+                      {opt}
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                <p className="mt-1 text-sm">{v.content}</p>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="mt-4">
+        {error && <p className="mb-2 text-xs" style={{ color: "#e0705f" }}>{error}</p>}
+
+        {inputType === "PHOTO" ? (
+          <>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) handlePhotoSelect(file);
+              }}
+            />
+            <Button onClick={() => fileInputRef.current?.click()} disabled={saving}>
+              {saving ? "در حال آپلود..." : latestContent ? "جایگزینی عکس" : "آپلود عکس"}
+            </Button>
+          </>
+        ) : inputType === "TRAIT_TAG" ? (
+          <div>
+            {!question.situationId && (
+              <p className="text-xs" style={{ color: "#e0a63f" }}>
+                این سؤال به هیچ موقعیتی وصل نیست — ادمین باید یک موقعیت برایش تعیین کند.
+              </p>
+            )}
+            {question.situationId && traitsError && (
+              <p className="text-xs" style={{ color: "#e0705f" }}>
+                بارگذاری صفات با خطا مواجه شد.
+              </p>
+            )}
+            {question.situationId && !traitsError && traits === null && (
+              <p className="text-xs opacity-60">در حال بارگذاری صفات...</p>
+            )}
+            {question.situationId && traits !== null && traits.length === 0 && (
+              <p className="text-xs opacity-60">هنوز صفتی برای این موقعیت تعریف نشده است.</p>
+            )}
+            {traits && traits.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {traits.map((t) => (
+                  <button
+                    key={t.traitId}
+                    type="button"
+                    onClick={() => saveContent(t.name)}
+                    disabled={saving}
+                    className="rounded-full border px-3 py-1.5 text-sm transition-colors disabled:opacity-50"
+                    style={
+                      latestContent === t.name
+                        ? { backgroundColor: "var(--accent)", color: "var(--bg)", borderColor: "var(--accent)" }
+                        : { backgroundColor: "var(--surface)", color: "var(--text)", borderColor: "var(--surface)" }
+                    }
+                  >
+                    {t.name}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        ) : inputType === "SINGLE_CHOICE" ? (
+          <div className="flex flex-wrap gap-2">
+            {(question.options ?? []).map((opt) => (
+              <button
+                key={opt}
+                type="button"
+                onClick={() => saveContent(opt)}
+                disabled={saving}
+                className="rounded-full border px-3 py-1.5 text-sm transition-colors disabled:opacity-50"
+                style={
+                  latestContent === opt
+                    ? { backgroundColor: "var(--accent)", color: "var(--bg)", borderColor: "var(--accent)" }
+                    : { backgroundColor: "var(--surface)", color: "var(--text)", borderColor: "var(--surface)" }
+                }
+              >
+                {opt}
+              </button>
+            ))}
+            {(question.options ?? []).length === 0 && (
+              <p className="text-xs opacity-60">این سؤال هنوز گزینه‌ای ندارد.</p>
+            )}
+          </div>
+        ) : inputType === "MULTI_CHOICE" ? (
+          <div>
+            <div className="flex flex-wrap gap-2">
+              {(question.options ?? []).map((opt) => {
+                const checked = multiSelection.includes(opt);
+                return (
+                  <button
+                    key={opt}
+                    type="button"
+                    onClick={() =>
+                      setMultiSelection((sel) =>
+                        checked ? sel.filter((o) => o !== opt) : [...sel, opt]
+                      )
+                    }
+                    className="rounded-full border px-3 py-1.5 text-sm transition-colors"
+                    style={
+                      checked
+                        ? { backgroundColor: "var(--accent)", color: "var(--bg)", borderColor: "var(--accent)" }
+                        : { backgroundColor: "var(--surface)", color: "var(--text)", borderColor: "var(--surface)" }
+                    }
+                  >
+                    {checked ? "✓ " : ""}
+                    {opt}
+                  </button>
+                );
+              })}
+              {(question.options ?? []).length === 0 && (
+                <p className="text-xs opacity-60">این سؤال هنوز گزینه‌ای ندارد.</p>
+              )}
+            </div>
+            <Button
+              className="mt-2"
+              onClick={() => saveContent(JSON.stringify(multiSelection))}
+              disabled={saving || multiSelection.length === 0}
+            >
+              {saving ? "در حال ثبت..." : "ثبت انتخاب‌ها"}
+            </Button>
+          </div>
+        ) : inputType === "LINK" ? (
+          <div className="flex gap-2">
+            <Input
+              type="url"
+              placeholder="https://instagram.com/username یا لینک لینکدین..."
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              className="flex-1"
+            />
+            <Button onClick={submitText} disabled={saving || !draft.trim()}>
+              {saving ? "..." : "ثبت"}
+            </Button>
+          </div>
+        ) : (
+          <>
+            <Textarea
+              rows={3}
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              placeholder={existingResponse ? "نسخه جدید پاسخ خود را بنویسید..." : "پاسخ خود را بنویسید..."}
+            />
+            <Button className="mt-2" onClick={submitText} disabled={saving || !draft.trim()}>
+              {saving ? "در حال ثبت..." : existingResponse ? "ثبت نسخه جدید" : "ثبت پاسخ"}
+            </Button>
+          </>
+        )}
+      </div>
+    </Card>
+  );
+}

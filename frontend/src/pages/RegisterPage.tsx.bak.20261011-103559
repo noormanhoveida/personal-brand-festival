@@ -1,0 +1,142 @@
+import { useState } from "react";
+import { useNavigate, Link } from "react-router-dom";
+import { register as registerApi } from "../api/auth";
+
+function toEnglishDigits(str: string) {
+  return str
+    .replace(/[۰-۹]/g, (d) => String(d.charCodeAt(0) - 1776))
+    .replace(/[٠-٩]/g, (d) => String(d.charCodeAt(0) - 1632))
+    .replace(/\s+/g, "");
+}
+
+export function RegisterPage() {
+  const navigate = useNavigate();
+  const [method, setMethod] = useState<"phone" | "email">("phone");
+  const [phone, setPhone] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [serverError, setServerError] = useState<string | null>(null);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setServerError(null);
+
+    if (password.length < 8) {
+      setServerError("رمز عبور باید حداقل ۸ کاراکتر باشد.");
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      if (method === "phone") {
+        const cleanPhone = toEnglishDigits(phone);
+        await registerApi({ phone: cleanPhone, password });
+        navigate("/verify-email", { state: { phone: cleanPhone, channel: "phone" } });
+      } else {
+        const cleanEmail = email.trim().toLowerCase();
+        await registerApi({ email: cleanEmail, password });
+        navigate("/verify-email", { state: { email: cleanEmail, channel: "email" } });
+      }
+    } catch (err: any) {
+      setServerError(err?.response?.data?.message ?? "خطایی در ثبت‌نام رخ داد.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="mx-auto flex max-w-sm flex-col gap-4 px-6 py-24">
+      <h1 className="text-2xl font-bold">ثبت‌نام در فستیوال</h1>
+
+      <div className="flex rounded-lg p-1" style={{ backgroundColor: "var(--surface)" }}>
+        <button
+          type="button"
+          onClick={() => { setMethod("phone"); setServerError(null); }}
+          className={`flex-1 rounded-md py-2 text-sm font-medium transition ${
+            method === "phone" ? "shadow font-bold" : "opacity-60"
+          }`}
+          style={{
+            backgroundColor: method === "phone" ? "var(--accent)" : "transparent",
+            color: method === "phone" ? "var(--bg)" : "inherit",
+          }}
+        >
+          شماره موبایل
+        </button>
+        <button
+          type="button"
+          onClick={() => { setMethod("email"); setServerError(null); }}
+          className={`flex-1 rounded-md py-2 text-sm font-medium transition ${
+            method === "email" ? "shadow font-bold" : "opacity-60"
+          }`}
+          style={{
+            backgroundColor: method === "email" ? "var(--accent)" : "transparent",
+            color: method === "email" ? "var(--bg)" : "inherit",
+          }}
+        >
+          ایمیل
+        </button>
+      </div>
+
+      <form onSubmit={handleSubmit} className="flex flex-col gap-3">
+        {method === "phone" ? (
+          <div>
+            <input
+              type="tel"
+              dir="ltr"
+              value={phone}
+              onChange={(e) => setPhone(toEnglishDigits(e.target.value))}
+              placeholder="09123456789"
+              required
+              className="w-full rounded-lg px-4 py-3 text-right"
+              style={{ backgroundColor: "var(--surface)" }}
+            />
+          </div>
+        ) : (
+          <div>
+            <input
+              type="email"
+              dir="ltr"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="name@example.com"
+              required
+              className="w-full rounded-lg px-4 py-3 text-right"
+              style={{ backgroundColor: "var(--surface)" }}
+            />
+          </div>
+        )}
+
+        <div>
+          <input
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="رمز عبور (حداقل ۸ کاراکتر)"
+            required
+            className="w-full rounded-lg px-4 py-3"
+            style={{ backgroundColor: "var(--surface)" }}
+          />
+        </div>
+
+        {serverError && <p className="text-sm text-red-400">{serverError}</p>}
+
+        <button
+          type="submit"
+          disabled={isSubmitting}
+          className="mt-2 rounded-full py-3 font-semibold disabled:opacity-50"
+          style={{ backgroundColor: "var(--accent)", color: "var(--bg)" }}
+        >
+          {isSubmitting ? "در حال ثبت‌نام..." : "ثبت‌نام"}
+        </button>
+      </form>
+
+      <p className="text-center text-sm opacity-70">
+        قبلاً ثبت‌نام کرده‌اید؟{" "}
+        <Link to="/login" style={{ color: "var(--accent)" }}>
+          وارد شوید
+        </Link>
+      </p>
+    </div>
+  );
+}

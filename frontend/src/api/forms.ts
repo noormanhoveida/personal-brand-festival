@@ -1,0 +1,230 @@
+import { apiClient } from "./client";
+
+export type QuestionInputType =
+  | "TEXT"
+  | "LINK"
+  | "PHOTO"
+  | "TRAIT_TAG"
+  | "SINGLE_CHOICE"
+  | "MULTI_CHOICE";
+
+export type FormType = "EVALUATION" | "PRE_ASSESSMENT";
+export type FormStatus = "DRAFT" | "ACTIVE" | "ARCHIVED";
+
+export interface FormQuestion {
+  id: string;
+  formId: string;
+  label: string;
+  helpText?: string | null;
+  inputType: QuestionInputType;
+  options: string[];
+  isRequired: boolean;
+  weight?: number | null;
+  order: number;
+  config?: any;
+}
+
+export interface FormAnswerItem {
+  id: string;
+  formQuestionId: string;
+  value: any;
+  autoScore?: number | null;
+  formQuestion?: {
+    id: string;
+    label: string;
+    inputType: QuestionInputType;
+  };
+}
+
+export interface FormAnswer {
+  id: string;
+  formId: string;
+  participantId?: string | null;
+  guestEmail?: string | null;
+  guestName?: string | null;
+  submittedAt?: string | null;
+  createdAt: string;
+  bootcampId?: string;
+  participant?: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    user?: { email: string };
+  } | null;
+  items: FormAnswerItem[];
+}
+
+export interface FormDetail {
+  type?: FormType;
+  id: string;
+  title: string;
+  slug: string;
+  description?: string | null;
+  isActive: boolean;
+  status: FormStatus;
+  themeConfig?: any;
+  startsAt?: string | null;
+  endsAt?: string | null;
+  createdAt: string;
+  bootcampId?: string;
+  updatedAt: string;
+  questions: FormQuestion[];
+  _count?: { answers: number };
+}
+
+export interface FormAnalytics {
+  totalSubmissions: number;
+  questions: {
+    questionId: string;
+    label: string;
+    inputType: QuestionInputType;
+    distribution?: Record<string, number>;
+    averageScore?: number;
+    sampleAnswers?: any[];
+    totalAnswers?: number;
+    recentAnswers?: any[];
+  }[];
+}
+
+// ================= Public =================
+export async function getPublicForms() {
+  const { data } = await apiClient.get<FormDetail[]>("/forms/public");
+  return data;
+}
+
+export async function getPublicFormByIdOrSlug(idOrSlug: string) {
+  const { data } = await apiClient.get<FormDetail>(`/forms/public/${idOrSlug}`);
+  return data;
+}
+
+export async function submitFormAnswer(
+  formId: string,
+  payload: {
+    guestEmail?: string;
+    guestName?: string;
+    items: { questionId: string; value: any }[];
+  }
+) {
+  const { data } = await apiClient.post(`/forms/${formId}/answers`, payload);
+  return data;
+}
+
+// ================= Admin =================
+export async function getAdminForms() {
+  const { data } = await apiClient.get<FormDetail[]>("/forms/admin/all");
+  return data;
+}
+
+export async function getAdminFormById(id: string) {
+  const { data } = await apiClient.get<FormDetail>(`/forms/admin/${id}`);
+  return data;
+}
+
+export async function createForm(payload: {
+  title: string;
+  description?: string;
+  slug?: string;
+  bootcampId?: string;
+  startsAt?: string;
+  endsAt?: string;
+}) {
+  const { data } = await apiClient.post<FormDetail>("/forms/admin", payload);
+  return data;
+}
+
+export async function updateForm(
+  id: string,
+  payload: Partial<{
+    title: string;
+    description: string;
+    slug: string;
+    bootcampId?: string;
+    isActive: boolean;
+    status: FormStatus;
+    startsAt: string | null;
+    endsAt: string | null;
+  }>
+) {
+  const { data } = await apiClient.put<FormDetail>(`/forms/admin/${id}`, payload);
+  return data;
+}
+
+export async function setFormStatus(id: string, status: FormStatus) {
+  const { data } = await apiClient.patch<FormDetail>(`/forms/admin/${id}/status`, { status });
+  return data;
+}
+
+export async function duplicateForm(id: string) {
+  const { data } = await apiClient.post<FormDetail>(`/forms/admin/${id}/duplicate`);
+  return data;
+}
+
+export async function deleteForm(id: string) {
+  await apiClient.delete(`/forms/admin/${id}`);
+}
+
+// Questions
+export async function addQuestion(
+  formId: string,
+  question: {
+    label: string;
+    helpText?: string;
+    inputType: QuestionInputType;
+    options?: string[];
+    isRequired?: boolean;
+    weight?: number;
+  }
+) {
+  const { data } = await apiClient.post<FormQuestion>(`/forms/admin/${formId}/questions`, question);
+  return data;
+}
+
+export async function updateQuestion(
+  questionId: string,
+  question: Partial<{
+    label: string;
+    helpText: string;
+    inputType: QuestionInputType;
+    options: string[];
+    isRequired: boolean;
+    weight: number;
+  }>
+) {
+  const { data } = await apiClient.put<FormQuestion>(
+    `/forms/admin/unused-id/questions/${questionId}`,
+    question
+  );
+  return data;
+}
+
+export async function deleteQuestion(formId: string, questionId: string) {
+  await apiClient.delete(`/forms/admin/${formId}/questions/${questionId}`);
+}
+
+export async function reorderQuestions(formId: string, orders: { id: string; order: number }[]) {
+  const { data } = await apiClient.post(`/forms/admin/${formId}/questions/reorder`, { orders });
+  return data;
+}
+
+// Answers & Analytics
+export async function getFormAnswers(formId: string) {
+  const { data } = await apiClient.get<FormAnswer[]>(`/forms/admin/${formId}/answers`);
+  return data;
+}
+
+export async function getFormAnalytics(formId: string) {
+  const { data } = await apiClient.get<FormAnalytics>(`/forms/admin/${formId}/analytics`);
+  return data;
+}
+
+export async function getMyPendingForms() {
+  const { data } = await apiClient.get<Array<{
+    id: string;
+    title: string;
+    slug: string;
+    bootcampId?: string;
+    description?: string | null;
+    questionCount: number;
+  }>>("/forms/my-pending");
+  return data;
+}

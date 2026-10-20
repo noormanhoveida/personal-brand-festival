@@ -1,0 +1,86 @@
+import { apiClient } from "./client";
+
+export interface JourneySection {
+  id: string;
+  key: string;
+  title: string;
+  description?: string | null;
+  order: number;
+}
+
+export interface JourneyQuestion {
+  id: string;
+  text: string;
+  stage: "BEFORE" | "AFTER" | "REVISION";
+  inputType: "TEXT" | "LINK" | "PHOTO" | "TRAIT_TAG" | "SINGLE_CHOICE" | "MULTI_CHOICE";
+  situationId?: string | null;
+  options?: string[];
+  order: number;
+}
+
+export interface JourneySectionDetail extends JourneySection {
+  questions: JourneyQuestion[];
+  bootcamps: { id: string; title: string; status: string }[];
+}
+
+export async function listJourneySections() {
+  const { data } = await apiClient.get<{ sections: JourneySection[] }>("/journey");
+  return data.sections;
+}
+
+export interface JourneySectionInput {
+  key: string;
+  title: string;
+  description?: string;
+  order?: number;
+}
+
+export async function createJourneySection(input: JourneySectionInput) {
+  const { data } = await apiClient.post<{ section: JourneySection }>("/journey", input);
+  return data.section;
+}
+
+export async function updateJourneySection(
+  sectionId: string,
+  input: Partial<Omit<JourneySectionInput, "key">>
+) {
+  const { data } = await apiClient.patch<{ section: JourneySection }>(
+    `/journey/${sectionId}`,
+    input
+  );
+  return data.section;
+}
+
+export async function deleteJourneySection(sectionId: string, force = false) {
+  await apiClient.delete(`/journey/${sectionId}${force ? '?force=true' : ''}`);
+}
+
+export async function getJourneySection(sectionId: string) {
+  const { data } = await apiClient.get<{ section: JourneySectionDetail }>(
+    `/journey/${sectionId}`
+  );
+  return data.section;
+}
+
+export async function createSectionQuestion(
+  sectionId: string,
+  input: {
+    text: string;
+    inputType: "TEXT" | "LINK" | "PHOTO" | "TRAIT_TAG" | "SINGLE_CHOICE" | "MULTI_CHOICE";
+    situationId?: string;
+    options?: string[];
+    order?: number;
+  }
+) {
+  const { data } = await apiClient.post(`/journey/${sectionId}/questions`, input);
+  return data;
+}
+
+// Attaches an existing bank question (e.g. from the auto-generated
+// trait/situation question bank) instead of authoring a new one.
+export async function attachQuestionToSection(sectionId: string, questionId: string) {
+  const { data } = await apiClient.post(`/journey/${sectionId}/questions/attach`, {
+    questionId,
+  });
+  return data;
+}

@@ -1,0 +1,81 @@
+import { PrismaClient } from '@prisma/client';
+import { slugify } from '../utils/slugify';
+
+const prisma = new PrismaClient();
+
+export interface FieldDefinition {
+  id: string;
+  type: 'text' | 'textarea' | 'number' | 'select' | 'radio' | 'checkbox' | 'email' | 'date';
+  label: string;
+  placeholder?: string;
+  required?: boolean;
+  options?: string[];
+  order: number;
+}
+
+export interface CreateFormInput {
+  title: string;
+  description?: string;
+  fields: FieldDefinition[];
+  isPublished?: boolean;
+}
+
+export const FormService = {
+  async getAll() {
+    return prisma.form.findMany({
+      orderBy: { createdAt: 'desc' },
+      include: { _count: { select: { submissions: true } } },
+    });
+  },
+
+  async getBySlug(slug: string) {
+    return prisma.form.findUnique({ where: { slug } });
+  },
+
+  async getById(id: string) {
+    return prisma.form.findUnique({
+      where: { id },
+      include: { submissions: { orderBy: { createdAt: 'desc' } } },
+    });
+  },
+
+  async create(input: CreateFormInput) {
+    const slug = slugify(input.title);
+    return prisma.form.create({
+      data: {
+        title: input.title,
+        slug,
+        description: input.description,
+        fields: input.fields as object,
+        isPublished: input.isPublished ?? false,
+      },
+    });
+  },
+
+  async update(id: string, input: Partial<CreateFormInput>) {
+    const data: Record<string, unknown> = { ...input };
+    if (input.title) data['slug'] = slugify(input.title);
+    if (input.fields) data['fields'] = input.fields as object;
+    return prisma.form.update({ where: { id }, data });
+  },
+
+  async delete(id: string) {
+    return prisma.form.delete({ where: { id } });
+  },
+
+  async submit(slug: string, data: Record<string, unknown>) {
+    const form = await prisma.form.findUnique({ where: { slug } });
+    if (!form) throw new Error('Form not found');
+    if (!form.isPublished) throw new Error('Form is not published');
+    return prisma.formSubmission.create({
+      data: { formId: form.id, data: data as object },
+    });
+  },
+
+  async getSubmissions(formId: string) {
+    return prisma.formSubmission.findMany({
+      where: { formId },
+      orderBy: { createdAt: 'desc' },
+    });
+  },
+};

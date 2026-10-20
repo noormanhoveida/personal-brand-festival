@@ -1,0 +1,222 @@
+import { RichTextEditor } from "../components/RichTextEditor";
+import { useEffect, useState } from "react";
+import {
+  ChallengeSubmission,
+  getMySubmission,
+  listChallenges,
+  submitChallengeWork,
+  uploadChallengeAttachment,
+  WeeklyChallenge,
+} from "../api/challenges";
+import { Button, Card, ErrorText, Input, LoadError, Spinner, Textarea } from "../components/ui";
+
+function ChallengeCard({ challenge }: { challenge: WeeklyChallenge }) {
+  const [submission, setSubmission] = useState<ChallengeSubmission | null>(null);
+  const [loaded, setLoaded] = useState(false);
+  const [textContent, setTextContent] = useState("");
+  const [linkUrl, setLinkUrl] = useState("");
+  const [photoUrl, setPhotoUrl] = useState<string | null>(null);
+  const [documentUrl, setDocumentUrl] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [saved, setSaved] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
+
+  useEffect(() => {
+    getMySubmission(challenge.id)
+      .then((s) => {
+        setSubmission(s);
+        if (s) {
+          setTextContent(s.textContent ?? "");
+          setLinkUrl(s.linkUrl ?? "");
+          setPhotoUrl(s.photoUrl);
+          setDocumentUrl(s.documentUrl);
+        }
+      })
+      .finally(() => setLoaded(true));
+  }, [challenge.id]);
+
+  const handleFileUpload = async (file: File, kind: "photo" | "document") => {
+    setUploading(true);
+    setError(null);
+    try {
+      const url = await uploadChallengeAttachment(challenge.id, file);
+      if (kind === "photo") setPhotoUrl(url);
+      else setDocumentUrl(url);
+    } catch {
+      setError("آپلود فایل با خطا مواجه شد.");
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleSubmit = async () => {
+    setSaving(true);
+    setError(null);
+    setSaved(false);
+    try {
+      const result = await submitChallengeWork(challenge.id, {
+        textContent: textContent.trim() || undefined,
+        linkUrl: linkUrl.trim() || undefined,
+        photoUrl: photoUrl ?? undefined,
+        documentUrl: documentUrl ?? undefined,
+      });
+      setSubmission(result);
+      setSaved(true);
+    } catch {
+      setError("ثبت پاسخ با خطا مواجه شد. حداقل یکی از متن، عکس، فایل یا لینک لازم است.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const versions = (submission?.versions && submission.versions.length > 0)
+    ? submission.versions
+    : (submission ? [{
+        id: submission.id,
+        versionNumber: 1,
+        textContent: submission.textContent,
+        photoUrl: submission.photoUrl,
+        documentUrl: submission.documentUrl,
+        linkUrl: submission.linkUrl,
+        createdAt: submission.updatedAt || submission.submittedAt
+      }] : []);
+
+  return (
+    <Card className="mt-4">
+      <h2 className="text-lg font-semibold">{challenge.title}</h2>
+      <p className="mt-1 text-sm opacity-70">{challenge.description}</p>
+      {challenge.deadline && (
+        <p className="mt-1 text-xs opacity-50">
+          مهلت ارسال: {new Date(challenge.deadline).toLocaleDateString("fa-IR")}
+        </p>
+      )}
+
+      {!loaded ? (
+        <Spinner />
+      ) : (
+        <div className="mt-3 space-y-3">
+          {submission && (
+            <div className="rounded-lg border border-white/10 bg-white/5 p-3 text-xs">
+              <div className="flex items-center justify-between">
+                <span style={{ color: "var(--accent)" }}>
+                  ✓ پاسخ شما ثبت شده است ({versions.length > 0 ? `${versions.length} نسخه در تاریخچه` : "نسخه ۱"}). می‌توانید نسخه جدید ثبت کنید.
+                </span>
+                {versions.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setShowHistory((prev) => !prev)}
+                    className="font-medium underline hover:opacity-80"
+                  >
+                    {showHistory ? "بستن تاریخچه نسخه‌ها ▲" : "مشاهده تاریخچه نسخه‌ها ▼"}
+                  </button>
+                )}
+              </div>
+
+              {showHistory && (
+                <div className="mt-3 space-y-2 border-t border-white/10 pt-2">
+                  <p className="font-semibold text-xs opacity-80">تاریخچه ارسال‌ها (از جدیدترین به قدیمی‌ترین):</p>
+                  {versions.map((ver) => (
+                    <div key={ver.id} className="rounded border border-white/10 bg-black/20 p-2.5 text-xs">
+                      <div className="flex items-center justify-between opacity-70 mb-1">
+                        <span className="font-bold">نسخه {ver.versionNumber}</span>
+                        <span>{new Date(ver.createdAt).toLocaleString("fa-IR")}</span>
+                      </div>
+                      {ver.textContent && <p className="opacity-90 whitespace-pre-wrap mt-1">{ver.textContent}</p>}
+                      {ver.linkUrl && (
+                        <a href={ver.linkUrl} target="_blank" rel="noreferrer" className="block text-accent underline mt-1 break-all">
+                          🔗 {ver.linkUrl}
+                        </a>
+                      )}
+                      {ver.photoUrl && (
+                        <a href={ver.photoUrl} target="_blank" rel="noreferrer" className="block mt-1">
+                          <img src={ver.photoUrl} alt="پیوست" className="h-16 rounded object-cover border border-white/10" />
+                        </a>
+                      )}
+                      {ver.documentUrl && (
+                        <a href={ver.documentUrl} target="_blank" rel="noreferrer" className="block text-xs underline mt-1">
+                          📄 دانلود فایل نسخه {ver.versionNumber}
+                        </a>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          <RichTextEditor
+            content={textContent}
+            onChange={(val) => setTextContent(val)}
+            placeholder="توضیح متنی کارت (اختیاری)"
+          />
+          <Input placeholder="لینک (اختیاری)" value={linkUrl} onChange={(e) => setLinkUrl(e.target.value)} />
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="text-xs opacity-60">عکس</label>
+              <input
+                type="file"
+                accept="image/*"
+                onChange={(e) => e.target.files?.[0] && handleFileUpload(e.target.files[0], "photo")}
+                className="block text-xs"
+              />
+              {photoUrl && <img src={photoUrl} alt="" className="mt-1 h-16 rounded object-cover" />}
+            </div>
+            <div>
+              <label className="text-xs opacity-60">فایل / داکیومنت</label>
+              <input
+                type="file"
+                onChange={(e) => e.target.files?.[0] && handleFileUpload(e.target.files[0], "document")}
+                className="block text-xs"
+              />
+              {documentUrl && (
+                <a href={documentUrl} target="_blank" rel="noreferrer" className="mt-1 block text-xs underline">
+                  فایل ضمیمه‌شده
+                </a>
+              )}
+            </div>
+          </div>
+          <Button onClick={handleSubmit} disabled={saving || uploading}>
+            {saving ? "در حال ثبت..." : submission ? "ثبت نسخه جدید" : "ثبت پاسخ"}
+          </Button>
+          {saved && <p className="text-xs" style={{ color: "var(--accent)" }}>نسخه جدید با موفقیت ثبت شد ✓</p>}
+          <ErrorText>{error}</ErrorText>
+        </div>
+      )}
+    </Card>
+  );
+}
+
+export function ChallengesPage() {
+  const [challenges, setChallenges] = useState<WeeklyChallenge[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const load = () => {
+    setError(null);
+    listChallenges()
+      .then(setChallenges)
+      .catch(() => setError("بارگذاری چالش‌ها با خطا مواجه شد."));
+  };
+
+  useEffect(load, []);
+
+  if (error) return <LoadError message={error} onRetry={load} />;
+  if (!challenges) {
+    return (
+      <div className="flex justify-center py-16">
+        <Spinner />
+      </div>
+    );
+  }
+
+  return (
+    <div className="mx-auto max-w-2xl">
+      <h1 className="text-2xl font-bold">چالش‌های هفتگی</h1>
+      {challenges.length === 0 && <p className="mt-4 text-sm opacity-60">در حال حاضر چالش فعالی وجود ندارد.</p>}
+      {challenges.map((c) => (
+        <ChallengeCard key={c.id} challenge={c} />
+      ))}
+    </div>
+  );
+}

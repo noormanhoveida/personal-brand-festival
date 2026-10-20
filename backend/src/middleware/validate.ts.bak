@@ -1,0 +1,23 @@
+import { NextFunction, Request, Response } from "express";
+import { ZodSchema, z } from "zod";
+
+export function validateBody(schema: ZodSchema) {
+  return (req: Request, res: Response, next: NextFunction) => {
+    // اگر اسکیما آبجکتی است که فیلد body دارد
+    const isWrappedInBody =
+      schema instanceof z.ZodObject && "body" in schema.shape;
+
+    const dataToParse = isWrappedInBody ? { body: req.body } : req.body;
+    const result = schema.safeParse(dataToParse);
+
+    if (!result.success) {
+      return res.status(422).json({
+        message: "داده‌های ارسالی نامعتبر است.",
+        errors: result.error.flatten().fieldErrors,
+      });
+    }
+
+    req.body = isWrappedInBody ? (result.data as any).body : result.data;
+    next();
+  };
+}

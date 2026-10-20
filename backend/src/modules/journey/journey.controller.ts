@@ -1,0 +1,113 @@
+import { prisma } from "../../config/db";
+import { NextFunction, Request, Response } from "express";
+import {
+  addSectionQuestion,
+  attachQuestionToSection,
+  createJourneySection,
+  deleteJourneySection,
+  getJourneySectionById,
+  listJourneySections,
+  updateJourneySection,
+} from "./journey.service";
+
+export async function listSections(_req: Request, res: Response, next: NextFunction) {
+  try {
+    const sections = await listJourneySections();
+    res.status(200).json({ sections });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function createSection(req: Request, res: Response, next: NextFunction) {
+  try {
+    const section = await createJourneySection(req.body);
+    res.status(201).json({ section });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function updateSection(req: Request, res: Response, next: NextFunction) {
+  try {
+    const section = await updateJourneySection(req.params.sectionId, req.body);
+    res.status(200).json({ section });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function deleteSection(req: Request, res: Response, next: NextFunction) {
+  try {
+    const force = req.query.force === 'true';
+    await deleteJourneySection(req.params.sectionId, force);
+    res.status(204).send();
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function getSection(req: Request, res: Response, next: NextFunction) {
+  try {
+    const section = await getJourneySectionById(req.params.sectionId);
+    res.status(200).json({ section });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function createSectionQuestion(req: Request, res: Response, next: NextFunction) {
+  try {
+    const question = await addSectionQuestion(req.params.sectionId, req.body);
+    res.status(201).json({ question });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function attachQuestion(req: Request, res: Response, next: NextFunction) {
+  try {
+    const question = await attachQuestionToSection(req.params.sectionId, req.body.questionId);
+    res.status(200).json({ question });
+  } catch (err) {
+    next(err);
+  }
+}
+
+
+export async function updateSectionQuestion(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { questionId } = req.params;
+    const { text, prompt, order, stage, inputType, options, situationId } = req.body;
+    const updated = await prisma.question.update({
+      where: { id: questionId },
+      data: {
+        ...(text !== undefined && { text }),
+        ...(prompt !== undefined && { text: prompt }),
+        ...(order !== undefined && { order: Number(order) }),
+        ...(stage !== undefined && { stage }),
+        ...(inputType !== undefined && { inputType }),
+        ...(options !== undefined && { options }),
+        ...(situationId !== undefined && { situationId: situationId || null }),
+      },
+    });
+    return res.json({ message: "سؤال با موفقیت ویرایش شد", question: updated });
+  } catch (err) {
+    return next(err);
+  }
+}
+
+export async function deleteSectionQuestion(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { questionId } = req.params;
+    await prisma.question.delete({
+      where: { id: questionId },
+    });
+    res.json({ message: "سؤال با موفقیت حذف شد" });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export const updateQuestion = updateSectionQuestion;
+export const deleteQuestion = deleteSectionQuestion;
