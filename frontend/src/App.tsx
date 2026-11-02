@@ -1,3 +1,5 @@
+import { AdminSiteHubPage, AdminEvaluationHubPage, AdminAcademyHubPage, AdminScienceHubPage } from "./pages/admin/AdminHubPages";
+import { AdminGuidesPage } from "./pages/admin/AdminGuidesPage";
 import { AnnouncementsPage } from "./pages/AnnouncementsPage";
 import { TicketsPage } from "./pages/TicketsPage";
 import { MyArtifacts } from "./components/MyArtifacts";
@@ -12,6 +14,8 @@ import { LoginPage } from "./pages/LoginPage";
 import { RegisterPage } from "./pages/RegisterPage";
 import { VerifyEmailPage } from "./pages/VerifyEmailPage";
 import { ShowcasePage } from "./pages/ShowcasePage";
+import { BusinessShowcasePage } from "./pages/BusinessShowcasePage";
+import { SponsorDetailPage } from "./pages/SponsorDetailPage";
 import { CommunityPage } from "./pages/CommunityPage";
 import { DashboardHomePage } from "./pages/DashboardHomePage";
 import { ProfilePage } from "./pages/ProfilePage";
@@ -37,6 +41,7 @@ import { AdminJourneyPage } from "./pages/admin/AdminJourneyPage";
 import { AdminUsersPage } from "./pages/admin/AdminUsersPage";
 import { AdminRegionsPage } from "./pages/admin/AdminRegionsPage";
 import { AdminParticipantsPage } from "./pages/admin/AdminParticipantsPage";
+import { AdminSponsorsPage } from "./pages/dashboard/admin/AdminSponsorsPage";
 import { AdminAssignmentsPage } from "./pages/admin/AdminAssignmentsPage";
 import { AdminCriteriaPage } from "./pages/admin/AdminCriteriaPage";
 import { AdminAnalyticsPage } from "./pages/admin/AdminAnalyticsPage";
@@ -56,10 +61,12 @@ import { EvaluatorPreAssessmentPage } from "./pages/evaluator/EvaluatorPreAssess
 import { ApprovalQueuePage } from "./pages/evaluator/ApprovalQueuePage";
 import { NotFoundPage } from "./pages/NotFoundPage";
 import { RequireAuth } from "./routes/RequireAuth";
+import PageGuide from "./components/PageGuide/PageGuide";
 
 export function App() {
   return (
     <BrowserRouter>
+      <PageGuide />
       <Routes>
         <Route element={<PublicLayout />}>
           <Route index element={<LandingPage />} />
@@ -68,12 +75,15 @@ export function App() {
           <Route path="register" element={<RegisterPage />} />
           <Route path="verify-email" element={<VerifyEmailPage />} />
           <Route path="showcase" element={<ShowcasePage />} />
+          <Route path="business-showcase" element={<BusinessShowcasePage />} />
         <Route path="network" element={<NetworkPage />} />
           <Route path="community" element={<CommunityPage />} />
           {/* Public — no account needed to open these */}
           <Route path="p/:slug" element={<PublicProfilePage />} />
           <Route path="feedback/:token" element={<PublicFeedbackFormPage />} />
           <Route path="forms/:slug" element={<PublicFormPage />} />
+          <Route path="sponsors/:slug" element={<SponsorDetailPage />} />
+
         </Route>
 
         <Route element={<RequireAuth />}>
@@ -129,6 +139,11 @@ export function App() {
         <Route element={<RequireAuth allow={["ADMIN"]} />}>
           <Route path="dashboard/admin" element={<DashboardLayout />}>
             <Route index element={<AdminOverviewPage />} />
+            <Route path="hub-site" element={<AdminSiteHubPage />} />
+            <Route path="hub-eval" element={<AdminEvaluationHubPage />} />
+            <Route path="hub-academy" element={<AdminAcademyHubPage />} />
+            <Route path="hub-science" element={<AdminScienceHubPage />} />
+            <Route path="guides" element={<AdminGuidesPage />} />
             <Route path="bootcamps" element={<AdminBootcampsPage />} />
             <Route path="artifacts" element={<AdminArtifactsPage />} />
             <Route path="journey" element={<AdminJourneyPage />} />
@@ -143,6 +158,7 @@ export function App() {
             <Route path="users" element={<AdminUsersPage />} />
             <Route path="regions" element={<AdminRegionsPage />} />
             <Route path="participants" element={<AdminParticipantsPage />} />
+            <Route path="sponsors" element={<AdminSponsorsPage />} />
             <Route path="assignments" element={<AdminAssignmentsPage />} />
             <Route path="criteria" element={<AdminCriteriaPage />} />
             <Route path="analytics" element={<AdminAnalyticsPage />} />
