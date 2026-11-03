@@ -32,6 +32,14 @@ enum Visibility {
   PUBLIC
 }
 
+
+enum BootcampRegistrationStatus {
+  INITIAL
+  PAID
+  FINALIZED
+  DONE
+}
+
 enum BootcampStatus {
   LOCKED
   COMING_SOON
@@ -98,6 +106,11 @@ model User {
   evaluatorAssignments EvaluatorAssignment[]
   activityLogs      ActivityLog[]
   notifications     Notification[]
+  sentDirectMessages     DirectMessage[]      @relation("SentDirectMessages")
+  receivedDirectMessages DirectMessage[]      @relation("ReceivedDirectMessages")
+  businessVideos         BusinessVideo[]
+  businessVideoComments  BusinessVideoComment[]
+  businessVideoLikes     BusinessVideoLike[]
   createdAt         DateTime            @default(now())
   updatedAt         DateTime            @updatedAt
 }
@@ -283,7 +296,7 @@ model JourneySection {
 }
 
 model Bootcamp {
-  recordingUrl       String?
+  registrations      BootcampRegistration[]
   accesses           BootcampAccess[]
   id                 String   @id @default(uuid())
   title              String
@@ -291,6 +304,9 @@ model Bootcamp {
   instructor         String?
   coverImageUrl      String?
   teaserVideoUrl     String?
+  recordingUrl       String?
+  paymentCardNumber        String?  // شماره کارت جهت واریز
+  paymentAccountHolderName String?  // نام صاحب حساب
   date               DateTime
   startTime          DateTime
   endTime            DateTime
@@ -1010,4 +1026,212 @@ model TicketMessage {
   createdAt DateTime   @default(now())
 
   @@index([ticketId])
+}
+
+
+enum SponsorPlacement {
+  DASHBOARD
+  LANDING_HERO
+  LANDING_VERTICAL
+}
+
+enum SponsorSlideType {
+  IMAGE
+  YOUTUBE
+}
+
+model Sponsor {
+  id              String           @id @default(cuid())
+  slug            String           @unique
+  name            String
+  tagline         String?
+  slideType       SponsorSlideType @default(IMAGE)
+  slideMediaUrl   String           // تصویر اسلاید یا لینک ویدیو
+  placement       SponsorPlacement @default(DASHBOARD)
+  order           Int              @default(0)
+  isActive        Boolean          @default(true)
+
+  // آمار بازدید و کلیک اسلایدر
+  viewCount       Int              @default(0)
+  clickCount      Int              @default(0)
+
+  // دکمه اقدام خارجی اختیاری
+  externalLinkLabel String?
+  externalLinkUrl   String?
+
+  // محتوای صفحه اختصاصی داخل سایت (/sponsors/:slug)
+  coverImageUrl   String?
+  fullDescription String?          @db.Text
+  websiteUrl      String?
+  instagramUrl    String?
+  linkedinUrl     String?
+  telegramUrl     String?
+
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  @@index([placement, isActive, order])
+}
+
+
+model BootcampRegistration {
+  id              String                     @id @default(uuid())
+  bootcampId      String
+  bootcamp        Bootcamp                   @relation(fields: [bootcampId], references: [id], onDelete: Cascade)
+  
+  fullName        String
+  mobile          String
+  email           String?
+  telegramId      String?                    // آیدی تلگرام
+  telegramPhone   String?                    // شماره تلگرام
+  notes           String?                    // توضیحات یا سوابق متقاضی
+  
+  status          BootcampRegistrationStatus @default(INITIAL)
+  trackingCode    String                     @unique @default(cuid())
+  finalMessage    String?                    // پیام اختصاصی یا متن نهایی ادمین
+  cardLastDigits  String?                    // ۴ رقم آخر کارت یا شماره پیگیری واریز
+  paidAt          DateTime?
+  finalizedAt     DateTime?
+
+  createdAt       DateTime                   @default(now())
+  updatedAt       DateTime                   @updatedAt
+
+  @@index([bootcampId])
+  @@index([status])
+}
+
+// ----------------------------------------------------------
+// APPLE-STYLE INTERACTIVE PAGE GUIDES
+// ----------------------------------------------------------
+
+model Guide {
+  id          String       @id @default(uuid())
+  pagePath    String       @unique // e.g. "/" or "/signup" or "/dashboard"
+  title       String?
+  isEnabled   Boolean      @default(true)
+  slides      GuideSlide[]
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+}
+
+model GuideSlide {
+  id          String   @id @default(uuid())
+  guideId     String
+  guide       Guide    @relation(fields: [guideId], references: [id], onDelete: Cascade)
+  title       String?
+  description String?
+  imageUrl    String?
+  order       Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([guideId, order])
+}
+
+
+// ==========================================
+// DIRECT USER-TO-USER CHAT MODULE
+// ==========================================
+model DirectMessage {
+  id          String   @id @default(uuid())
+  senderId    String
+  sender      User     @relation("SentDirectMessages", fields: [senderId], references: [id], onDelete: Cascade)
+  receiverId  String
+  receiver    User     @relation("ReceivedDirectMessages", fields: [receiverId], references: [id], onDelete: Cascade)
+  content     String   @db.Text
+  isRead      Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  @@index([senderId, receiverId])
+  @@index([receiverId])
+}
+
+
+// ==========================================
+// BUSINESS SHOWCASE MODULE (ویترین کسب‌وکارها)
+// ==========================================
+
+enum BusinessVideoStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum BusinessCategory {
+  TECH
+  SERVICES
+  EDUCATION
+  RETAIL
+  CREATIVE
+  OTHER
+}
+
+model BusinessVideo {
+  id              String               @id @default(uuid())
+  userId          String
+  user            User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  businessName    String
+  ownerName       String
+  category        BusinessCategory     @default(OTHER)
+  
+  videoUrl        String
+  thumbnailUrl    String?
+  durationSeconds Int                  @default(0)
+  fileSizeBytes   Int                  @default(0)
+  
+  description     String?              @db.Text
+  websiteUrl      String?
+  instagramUrl    String?
+  telegramUrl     String?
+  phoneNumber     String?
+  
+  status          BusinessVideoStatus  @default(PENDING)
+  rejectionReason String?              @db.Text
+  
+  viewCount       Int                  @default(0)
+  likeCount       Int                  @default(0)
+  isFeatured      Boolean              @default(false)
+  order           Int                  @default(0)
+  
+  comments        BusinessVideoComment[]
+  likes           BusinessVideoLike[]
+
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+
+  @@index([status, category])
+  @@index([userId])
+  @@index([createdAt])
+}
+
+model BusinessVideoComment {
+  id              String                @id @default(uuid())
+  videoId         String
+  video           BusinessVideo         @relation(fields: [videoId], references: [id], onDelete: Cascade)
+  userId          String
+  user            User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  content         String                @db.Text
+  parentId        String?
+  parent          BusinessVideoComment? @relation("BusinessCommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies         BusinessVideoComment[] @relation("BusinessCommentReplies")
+  
+  isApproved      Boolean               @default(true)
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
+
+  @@index([videoId])
+  @@index([userId])
+}
+
+model BusinessVideoLike {
+  id              String         @id @default(uuid())
+  videoId         String
+  video           BusinessVideo  @relation(fields: [videoId], references: [id], onDelete: Cascade)
+  userId          String
+  user            User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt       DateTime       @default(now())
+
+  @@unique([videoId, userId])
+  @@index([videoId])
 }

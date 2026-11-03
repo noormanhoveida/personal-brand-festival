@@ -1,0 +1,20 @@
+import { Router } from "express";
+import { SponsorController } from "./sponsor.controller";
+import { requireAuth } from "../../middleware/auth.middleware";
+import { requireRole } from "../../middleware/rbac.middleware";
+import { validateBody } from "../../middleware/validate";
+import { createSponsorSchema, updateSponsorSchema } from "./sponsor.validator";
+
+const router = Router();
+
+// روت‌های عمومی برای نمایش در کلاینت (داشبورد، لندینگ، صفحه اختصاصی اسپانسر)
+router.get("/public", SponsorController.getPublicList);
+router.get("/public/:slug", SponsorController.getPublicBySlug);
+
+// روت‌های ادمین (فقط نقش‌های مجاز)
+router.get("/admin", requireAuth, requireRole("ADMIN" as any, "SUPERADMIN" as any), SponsorController.getAllAdmin);
+router.post("/admin", requireAuth, requireRole("ADMIN" as any, "SUPERADMIN" as any), validateBody(createSponsorSchema), SponsorController.create);
+router.put("/admin/:id", requireAuth, requireRole("ADMIN" as any, "SUPERADMIN" as any), validateBody(updateSponsorSchema), SponsorController.update);
+router.delete("/admin/:id", requireAuth, requireRole("ADMIN" as any, "SUPERADMIN" as any), SponsorController.delete);
+
+export default router;

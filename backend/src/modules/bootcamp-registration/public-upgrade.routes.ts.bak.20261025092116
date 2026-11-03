@@ -1,0 +1,59 @@
+import { Router, Request, Response } from "express";
+import { PrismaClient } from "@prisma/client";
+
+const prisma = new PrismaClient();
+const router = Router();
+
+// پیدا کردن ثبت‌نام قبلی کاربر با ایمیل + بوت‌کمپ (جلوگیری از رکورد تکراری)
+router.get("/public/find", async (req: Request, res: Response) => {
+  try {
+    const email = String(req.query.email || "").trim();
+    const bootcampId = String(req.query.bootcampId || "").trim();
+    if (!email || !bootcampId) {
+      return res.status(400).json({ success: false, message: "ایمیل یا بوت‌کمپ نامعتبر است." });
+    }
+    const reg = await prisma.bootcampRegistration.findFirst({
+      where: { email: { equals: email, mode: "insensitive" as const }, bootcampId },
+      orderBy: { createdAt: "desc" },
+    });
+    res.json({ success: true, data: reg });
+  } catch (e: any) {
+    res.status(400).json({ success: false, message: e.message });
+  }
+});
+
+// تکمیل پرداخت روی ثبت‌نام موجود: ۴ رقم آخر کارت + لینک فیش + یادداشت
+router.patch("/public/:code/payment", async (req: Request, res: Response) => {
+  try {
+    const code = String(req.params.code || "").trim();
+    const { cardLastDigits, receiptUrl, note } = req.body || {};
+
+    const reg = await prisma.bootcampRegistration.findUnique({ where: { trackingCode: code } });
+    if (!reg) {
+      return res.status(404).json({ success: false, message: "ثبت‌نامی با این کد رهگیری یافت نشد." });
+    }
+
+    // یادداشت جدید به یادداشت‌های قبلی اضافه می‌شود (بدون از دست رفتن متن)
+    let notes = reg.notes ?? "";
+    if (note && String(note).trim()) {
+      notes = notes ? `${notes}\n${String(note).trim()}` : String(note).trim();
+    }
+    if (receiptUrl && !notes.includes(String(receiptUrl))) {
+      const link = `[لینک رسید پرداخت: ${receiptUrl}]`;
+      notes = notes ? `${notes}\n${link}` : link;
+    }
+
+    const updated = await prisma.bootcampRegistration.update({
+      where: { trackingCode: code },
+      data: {
+        cardLastDigits: cardLastDigits ? String(cardLastDigits).trim() : reg.cardLastDigits,
+        notes: notes || null,
+      },
+    });
+    res.json({ success: true, data: updated });
+  } catch (e: any) {
+    res.status(400).json({ success: false, message: e.message });
+  }
+});
+
+export default router;

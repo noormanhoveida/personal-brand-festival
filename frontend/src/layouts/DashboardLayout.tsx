@@ -1,9 +1,11 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { NavLink, Outlet, useLocation, Link } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { ThemeSwitcher } from "../features/theme/ThemeSwitcher";
 import { useAppSelector } from "../hooks/redux";
 import { PreAssessmentGate } from "../components/PreAssessmentGate";
+import { announcementsApi } from "../api/announcements";
+import { ticketsApi } from "../api/tickets";
 
 const PARTICIPANT_NAV = [
   { to: "/dashboard", label: "داشبورد" },
@@ -12,40 +14,36 @@ const PARTICIPANT_NAV = [
   { to: "/dashboard/challenges", label: "چالش‌های هفتگی" },
   { to: "/dashboard/mirror", label: "آینه من" },
   { to: "/dashboard/artifacts", label: "آثار و دستاوردها" },
+  { to: "/dashboard/business-showcase", label: "معرفی کسب‌وکار" },
   { to: "/dashboard/transformation", label: "مسیر تحول" },
   { to: "/dashboard/profile", label: "پروفایل من" },
   { to: "/dashboard/public-page", label: "صفحه عمومی من" },
+  { to: "/dashboard/tickets", label: "چت و پشتیبانی" },
+  { to: "/dashboard/announcements", label: "اطلاعیه‌ها" },
 ];
 
 const EVALUATOR_NAV = [
   { to: "/dashboard/evaluator", label: "شرکت‌کنندگان من" },
   { to: "/dashboard/approval", label: "تأیید پاسخ‌ها" },
   { to: "/dashboard/leaderboards", label: "تابلوهای امتیاز" },
+  { to: "/dashboard/tickets", label: "چت و پشتیبانی" },
+  { to: "/dashboard/announcements", label: "اطلاعیه‌ها" },
 ];
 
 const MANAGER_NAV = [
   { to: "/dashboard/manager/bootcamps", label: "مدیریت بوت‌کمپ‌ها / آکادمی" },
   { to: "/dashboard/manager/challenges", label: "چالش‌های هفتگی" },
+  { to: "/dashboard/tickets", label: "چت و پشتیبانی" },
+  { to: "/dashboard/announcements", label: "اطلاعیه‌ها" },
 ];
 
 const ADMIN_NAV = [
   { to: "/dashboard/admin", label: "نمای کلی" },
-  { to: "/dashboard/admin/bootcamps", label: "مدیریت بوت‌کمپ‌ها / آکادمی" },
-  { to: "/dashboard/admin/artifacts", label: "مدیریت آثار" },
-  { to: "/dashboard/admin/journey", label: "مدیریت مسیر برند" },
-  { to: "/dashboard/admin/situations", label: "موقعیت‌ها و صفات" },
-  { to: "/dashboard/admin/pre-assessment", label: "پیش‌ارزیابی" },
-  { to: "/dashboard/admin/challenges", label: "چالش‌های هفتگی" },
-  { to: "/dashboard/leaderboards", label: "تابلوهای امتیاز" },
-  { to: "/dashboard/admin/users", label: "کاربران" },
-  { to: "/dashboard/admin/regions", label: "مناطق" },
-  { to: "/dashboard/admin/participants", label: "شرکت‌کنندگان" },
-  { to: "/dashboard/admin/assignments", label: "تخصیص ارزیاب" },
-  { to: "/dashboard/admin/criteria", label: "معیارهای ارزیابی" },
-  { to: "/dashboard/admin/analytics", label: "آنالیتیکس" },
-  { to: "/dashboard/admin/forms", label: "فرم‌ساز و نظرسنجی" },
-  { to: "/dashboard/admin/showcase", label: "ویترین فستیوال" },
-  { to: "/dashboard/admin/landing", label: "مدیریت صفحه اصلی" },
+  { to: "/dashboard/admin/hub-site", label: "مدیریت سایت" },
+  { to: "/dashboard/admin/hub-eval", label: "مدیریت ارزیابی" },
+  { to: "/dashboard/admin/hub-academy", label: "مدیریت آکادمی و بوت‌کمپ" },
+  { to: "/dashboard/admin/hub-science", label: "مدیریت علمی" },
+  { to: "/dashboard/admin/hub-economy", label: "مدیریت اقتصادی" },
 ];
 
 function NavSection({
@@ -72,20 +70,52 @@ function NavSection({
             end={it.to === "/dashboard"}
             onClick={onNavigate}
             className={({ isActive }) =>
-              `flex items-center rounded-xl px-3 py-2 text-sm font-medium transition ${
+              `flex items-center justify-between rounded-xl px-3 py-2 text-sm font-medium transition ${
                 isActive
                   ? "bg-amber-500/15 text-amber-500 font-bold"
                   : "opacity-75 hover:opacity-100 hover:bg-white/5"
               }`
             }
           >
-            {it.label}
+            <span>{it.label}</span>
           </NavLink>
         ))}
       </div>
     </div>
   );
 }
+
+function BellButton({ count }: { count: number }) {
+  return (
+    <Link
+      to="/dashboard/announcements"
+      title="اطلاعیه‌ها"
+      className="relative inline-flex items-center justify-center rounded-full border p-2 transition hover:scale-105"
+      style={{ borderColor: "var(--surface)", backgroundColor: "var(--bg-secondary)" }}
+    >
+      <svg
+        className="h-5 w-5"
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+        strokeWidth="1.8"
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M14.857 17H9.143m9.714 0A2.143 2.143 0 0017.714 15V11a5.714 5.714 0 10-11.428 0v4A2.143 2.143 0 005.143 17m13.714 0H5.143m5.214 0a1.643 1.643 0 003.286 0"
+        />
+      </svg>
+      {count > 0 && (
+        <span className="absolute -right-1 -top-1 min-w-[18px] rounded-full bg-red-500 px-1.5 py-0.5 text-center text-[10px] font-bold leading-none text-white">
+          {count > 99 ? "99+" : count}
+        </span>
+      )}
+    </Link>
+  );
+}
+
+
 
 function NavContent({ role, onNavigate }: { role?: any; onNavigate?: () => void }) {
   return (
@@ -113,13 +143,51 @@ function NavContent({ role, onNavigate }: { role?: any; onNavigate?: () => void 
 export function DashboardLayout() {
   const role = useAppSelector((s) => s.auth.role);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [announcementCount, setAnnouncementCount] = useState(0);
+  const [hasOpenTicket, setHasOpenTicket] = useState(false);
   const location = useLocation();
 
   const isDashboardHome = location.pathname === "/dashboard" || location.pathname === "/dashboard/";
+  const isTicketsPage = location.pathname.startsWith("/dashboard/tickets");
+
+  useEffect(() => {
+    let alive = true;
+
+    announcementsApi
+      .getAnnouncements()
+      .then((items) => {
+        if (!alive) return;
+        setAnnouncementCount(Array.isArray(items) ? items.length : 0);
+      })
+      .catch(() => {
+        if (!alive) return;
+        setAnnouncementCount(0);
+      });
+
+    const ticketRequest =
+      role === "ADMIN" ? ticketsApi.getAllTickets() : ticketsApi.getMyTickets();
+
+    ticketRequest
+      .then((items) => {
+        if (!alive) return;
+        const list = Array.isArray(items) ? items : [];
+        setHasOpenTicket(list.some((t) => t.status === "OPEN" || t.status === "ANSWERED"));
+      })
+      .catch(() => {
+        if (!alive) return;
+        setHasOpenTicket(false);
+      });
+
+    return () => {
+      alive = false;
+    };
+  }, [role]);
+
 
   return (
     <div className="flex min-h-screen relative">
       <PreAssessmentGate />
+
       {/* Desktop sidebar */}
       <aside
         className="hidden w-64 shrink-0 flex-col gap-1 border-l px-4 py-6 md:flex"
@@ -161,16 +229,20 @@ export function DashboardLayout() {
 
       <div className="flex flex-1 flex-col">
         <header
-          className="flex items-center justify-between border-b px-6 py-3"
+          className="flex items-center justify-between gap-3 border-b px-6 py-3"
           style={{ borderColor: "var(--surface)" }}
         >
-          <button
-            onClick={() => setDrawerOpen(true)}
-            className="text-sm opacity-70 md:hidden"
-            aria-label="باز کردن منو"
-          >
-            ☰ منو
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setDrawerOpen(true)}
+              className="text-sm opacity-70 md:hidden"
+              aria-label="باز کردن منو"
+            >
+              ☰ منو
+            </button>
+            <BellButton count={announcementCount} />
+          </div>
+
           <nav
             aria-label="پیوندهای عمومی"
             className="hidden min-w-0 flex-1 md:flex items-center justify-center gap-3 overflow-x-auto px-2 text-xs md:gap-6 md:text-sm"
@@ -188,55 +260,27 @@ export function DashboardLayout() {
               بوت‌کمپ‌ها / آکادمی
             </Link>
           </nav>
+
           <ThemeSwitcher />
         </header>
+
         <main className="flex-1 p-6">
           <Outlet />
         </main>
       </div>
 
-      {/* دکمه شناور بازگشت به داشبورد اصلی */}
+      
+
       <AnimatePresence>
-        {!isDashboardHome && (
-          <motion.div
-            initial={{ opacity: 0, scale: 0.8, y: 20 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.8, y: 20 }}
-            transition={{ type: "spring", stiffness: 350, damping: 25 }}
-            className="fixed bottom-6 left-6 z-40"
-          >
-            <Link
-              to="/dashboard"
-              title="بازگشت به داشبورد اصلی"
-              className="group flex items-center gap-2.5 rounded-full px-4 py-3 shadow-2xl backdrop-blur-md transition-all duration-300 hover:scale-105 active:scale-95 border"
-              style={{
-                backgroundColor: "rgba(24, 24, 27, 0.88)",
-                borderColor: "rgba(245, 158, 11, 0.4)",
-                boxShadow: "0 10px 25px -5px rgba(245, 158, 11, 0.25), 0 8px 10px -6px rgba(0, 0, 0, 0.5)",
-              }}
-            >
-              <div className="flex h-7 w-7 items-center justify-center rounded-full bg-amber-500/20 text-amber-400 group-hover:bg-amber-500 group-hover:text-zinc-950 transition-colors">
-                <svg
-                  className="h-4 w-4"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth="2.2"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"
-                  />
-                </svg>
-              </div>
-              <span className="text-xs font-bold text-zinc-100 group-hover:text-amber-400 transition-colors">
-                داشبورد اصلی
-              </span>
-            </Link>
-          </motion.div>
-        )}
       </AnimatePresence>
+
+      {hasOpenTicket && !isTicketsPage && (
+        <div className="fixed bottom-24 right-7 z-30 hidden md:block">
+          <div className="rounded-full bg-emerald-500 px-3 py-1 text-[11px] font-bold text-white shadow-lg">
+            گفت‌وگوی فعال
+          </div>
+        </div>
+      )}
     </div>
   );
 }

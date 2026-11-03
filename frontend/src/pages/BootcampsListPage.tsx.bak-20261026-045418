@@ -1,0 +1,442 @@
+import { useState, useEffect } from "react";
+import { FormattedContent } from "../components/FormattedContent";
+import { useNavigate } from "react-router-dom";
+import { Bootcamp, listBootcamps } from "../api/bootcamps";
+import {
+  createBootcampRegistration,
+  findBootcampRegistration,
+  completeBootcampRegistrationPayment,
+  uploadReceiptFile,
+} from "../api/bootcampRegistrations";
+import { getProfile } from "../api/profile";
+import { useAsync } from "../hooks/useAsync";
+import { Card, LoadError, Spinner } from "../components/ui";
+import { BrandMascot } from "../components/BrandMascot";
+
+const STATUS_LABEL: Record<Bootcamp["status"], string> = {
+  LOCKED: "قفل‌شده",
+  COMING_SOON: "به‌زودی",
+  ACTIVE: "فعال",
+  DEADLINE_APPROACHING: "مهلت رو به پایان",
+  SUBMITTED: "ثبت‌شده",
+  COMPLETED: "تکمیل‌شده",
+};
+
+const STATUS_COLOR: Record<Bootcamp["status"], string> = {
+  LOCKED: "#6b7280",
+  COMING_SOON: "#8b8b8b",
+  ACTIVE: "var(--accent)",
+  DEADLINE_APPROACHING: "#e0a63f",
+  SUBMITTED: "#4fbf8f",
+  COMPLETED: "#4fbf8f",
+};
+
+// شماره کارت و مشخصات پیش‌فرض حساب جهت پرداخت هزینه بوت‌کمپ
+const PAYMENT_INFO = {
+  cardNumber: "۶۰۳۷-۹۹۷۵-۹۹۹۹-۹۹۹۹",
+  cardHolder: "جشنواره برند شخصی",
+  feeText: "۲,۵۰۰,۰۰۰ تومان",
+};
+
+export function BootcampsListPage() {
+  const navigate = useNavigate();
+  const { data: bootcamps, error, loading, reload } = useAsync(() => listBootcamps());
+
+  // استیت‌های مربوط به مدال ثبت نام زودهنگام
+  const [activeBootcamp, setActiveBootcamp] = useState<Bootcamp | null>(null);
+  const [fullName, setFullName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [email, setEmail] = useState("");
+  const [telegramId, setTelegramId] = useState("");
+  const [cardLastDigits, setCardLastDigits] = useState("");
+  const [notes, setNotes] = useState("");
+  const [receiptFile, setReceiptFile] = useState<File | null>(null);
+  const [receiptPreview, setReceiptPreview] = useState<string | null>(null);
+
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [trackingResult, setTrackingResult] = useState<string | null>(null);
+
+  // باز کردن مدال و لود کردن مشخصات پیش‌فرض پروفایل
+  const handleOpenRegistration = async (b: Bootcamp, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setActiveBootcamp(b);
+    setSubmitError(null);
+    setTrackingResult(null);
+    setReceiptFile(null);
+    setReceiptPreview(null);
+
+    try {
+      const res = await getProfile();
+      if (res?.profile) {
+        const p = res.profile as any;
+        const nameParts = [p.firstName, p.lastName].filter(Boolean).join(" ");
+        if (nameParts) setFullName(nameParts);
+        if (p.mobile || p.phone) setPhone(p.mobile || p.phone);
+        if (p.user?.email || p.email) setEmail(p.user?.email || p.email);
+        if (p.telegram || p.telegramId) setTelegramId(p.telegram || p.telegramId);
+      }
+    } catch {
+      // اگر کاربر هنوز لاگین نکرده یا پروفایل نگرفته، فرم خالی نمایش داده می‌شود
+    }
+  };
+
+  const handleCloseModal = () => {
+    setActiveBootcamp(null);
+    setTrackingResult(null);
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      setReceiptFile(file);
+      setReceiptPreview(URL.createObjectURL(file));
+    }
+  };
+
+      const handleSubmitRegistration = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!activeBootcamp) return;
+
+    setSubmitting(true);
+    setSubmitError(null);
+
+    try {
+      const emailVal = (email || "").trim();
+      let uploadedReceiptUrl = "";
+      if (receiptFile) {
+        uploadedReceiptUrl = await uploadReceiptFile(receiptFile);
+      }
+
+      let existingTracking: string | null = null;
+      if (emailVal) {
+        try {
+          const findRes = await findBootcampRegistration({
+            bootcampId: activeBootcamp.id,
+            email: emailVal,
+          });
+          if (findRes && findRes.data && findRes.data.trackingCode) {
+            existingTracking = findRes.data.trackingCode;
+          }
+        } catch (err) {}
+      }
+
+      let resData: any;
+      if (existingTracking) {
+        if (!uploadedReceiptUrl && !cardLastDigits.trim()) {
+          setSubmitError("برای تکمیل ثبت‌نام قبلی، لطفاً فیش یا ۴ رقم آخر کارت را وارد کنید.");
+          setSubmitting(false);
+          return;
+        }
+        resData = await completeBootcampRegistrationPayment({
+          trackingCode: existingTracking,
+          cardLastDigits: cardLastDigits.trim() || undefined,
+          receiptUrl: uploadedReceiptUrl || undefined,
+          note: notes.trim() || undefined,
+        });
+        setTrackingResult(resData?.data?.trackingCode || existingTracking);
+      } else {
+        if (!fullName.trim() || !phone.trim()) {
+          setSubmitError("نام کامل و شماره موبایل برای ثبت‌نام الزامی است.");
+          setSubmitting(false);
+          return;
+        }
+        resData = await createBootcampRegistration({
+          bootcampId: activeBootcamp.id,
+          fullName: fullName.trim(),
+          phone: phone.trim(),
+          email: emailVal || undefined,
+          telegramId: telegramId.trim() || undefined,
+          cardLastDigits: cardLastDigits.trim() || undefined,
+          note: notes.trim() || undefined,
+          receiptUrl: uploadedReceiptUrl || undefined,
+        });
+        setTrackingResult(resData?.data?.trackingCode || "ثبت شد");
+      }
+    } catch (err: any) {
+      setSubmitError(
+        err?.response?.data?.message || err?.message || "خطا در فرآیند ثبت‌نام"
+      );
+    } finally {
+      setSubmitting(false);
+    }
+  };;
+
+  if (error) return <LoadError message={error} onRetry={reload} />;
+
+  if (loading || !bootcamps) {
+    return (
+      <div className="flex justify-center py-16">
+        <Spinner />
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <h1 className="text-2xl font-bold">بوت‌کمپ‌ها / آکادمی</h1>
+
+      <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {bootcamps.map((b) => (
+          <div
+            key={b.id}
+            onClick={() => navigate(`/dashboard/bootcamps/${b.id}`)}
+            className="cursor-pointer"
+          >
+            <Card className="glass flex h-full flex-col overflow-hidden p-0 transition-transform hover:-translate-y-1">
+              <div className="relative h-36 w-full">
+                {b.teaserVideoUrl ? (
+                  <video
+                    src={b.teaserVideoUrl}
+                    poster={b.coverImageUrl ?? undefined}
+                    className="h-full w-full object-cover"
+                    muted
+                    loop
+                    playsInline
+                    onMouseEnter={(e) => e.currentTarget.play().catch(() => {})}
+                    onMouseLeave={(e) => e.currentTarget.pause()}
+                  />
+                ) : b.coverImageUrl ? (
+                  <img src={b.coverImageUrl} alt="" className="h-full w-full object-cover" />
+                ) : (
+                  <div
+                    className="flex h-full w-full items-center justify-center"
+                    style={{ backgroundColor: "var(--surface)" }}
+                  >
+                    <div className="w-14">
+                      <BrandMascot />
+                    </div>
+                  </div>
+                )}
+                <span
+                  className="absolute top-2 right-2 rounded-full px-3 py-1 text-xs font-medium"
+                  style={{ backgroundColor: "var(--bg)", color: STATUS_COLOR[b.status] }}
+                >
+                  {STATUS_LABEL[b.status]}
+                </span>
+                {b.teaserVideoUrl && (
+                  <span
+                    className="absolute bottom-2 left-2 rounded-full px-2 py-0.5 text-[10px]"
+                    style={{ backgroundColor: "var(--bg)", color: "var(--text)" }}
+                  >
+                    ▶ تیزر
+                  </span>
+                )}
+              </div>
+
+              <div className="flex flex-1 flex-col p-4">
+                <div className="font-semibold">{b.title}</div>
+                {b.description && (
+                  <FormattedContent
+                    content={b.description}
+                    className="mt-1 text-xs opacity-70 line-clamp-2"
+                  />
+                )}
+
+                <div className="mt-auto pt-3 flex items-center justify-between text-xs opacity-75">
+                  <span>
+                    {new Date(b.date).toLocaleDateString("fa-IR")}
+                    {b.instructor && ` · مربی: ${b.instructor}`}
+                  </span>
+                </div>
+
+                {/* دکمه اختصاصی پیش‌ثبت‌نام برای بوت‌کمپ‌هایی که در وضعیت به‌زودی هستند */}
+                {b.status === "COMING_SOON" && (
+                  <div className="mt-3 pt-3 border-t border-[var(--border)]">
+                    <button
+                      type="button"
+                      onClick={(e) => handleOpenRegistration(b, e)}
+                      className="w-full py-2 px-3 rounded-lg text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white transition-colors flex items-center justify-center gap-1 shadow"
+                    >
+                      <span>📝 پیش‌ثبت‌نام زودهنگام</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+            </Card>
+          </div>
+        ))}
+
+        {bootcamps.length === 0 && (
+          <p className="text-sm opacity-60">هنوز بوت‌کمپی تعریف نشده است.</p>
+        )}
+      </div>
+
+      {/* مدال ثبت‌نام و پرداخت */}
+      {activeBootcamp && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fadeIn">
+          <div className="relative w-full max-w-lg rounded-2xl bg-[var(--surface)] border border-[var(--border)] p-6 shadow-2xl max-h-[90vh] overflow-y-auto">
+            <button
+              onClick={handleCloseModal}
+              className="absolute top-4 left-4 text-lg font-bold opacity-60 hover:opacity-100"
+            >
+              ✕
+            </button>
+
+            <h2 className="text-lg font-bold text-[var(--text)] mb-1">
+              پیش‌ثبت‌نام در: {activeBootcamp.title}
+            </h2>
+            <p className="text-xs opacity-70 mb-4">
+              مشخصات خود را تکمیل کرده، فیش واریزی را پیوست و درخواست را نهایی کنید.
+            </p>
+
+            {trackingResult ? (
+              <div className="space-y-4 text-center py-6">
+                <div className="text-4xl">🎉</div>
+                <h3 className="text-base font-bold text-emerald-400">
+                  درخواست شما با موفقیت ثبت شد
+                </h3>
+                <p className="text-xs opacity-80 leading-relaxed">
+                  رسید واریزی شما در صف بررسی ادمین قرار گرفت. کد رهگیری زیر را نزد خود نگه دارید:
+                </p>
+                <div className="inline-block p-3 rounded-xl bg-black/40 border border-emerald-500/50 font-mono text-base font-bold tracking-widest text-emerald-400">
+                  {trackingResult}
+                </div>
+                <div>
+                  <button
+                    onClick={handleCloseModal}
+                    className="mt-4 px-6 py-2 rounded-lg bg-[var(--accent)] text-white text-xs font-semibold"
+                  >
+                    متوجه شدم
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <form onSubmit={handleSubmitRegistration} className="space-y-4">
+                {submitError && (
+                  <div className="p-3 text-xs rounded-lg bg-rose-500/20 text-rose-300 border border-rose-500/30">
+                    {submitError}
+                  </div>
+                )}
+
+                {/* اطلاعات مشخصات فردی */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                  <div>
+                    <label className="block mb-1 font-medium">نام و نام خانوادگی *</label>
+                    <input
+                      type="text"
+                      required
+                      value={fullName}
+                      onChange={(e) => setFullName(e.target.value)}
+                      placeholder="علی محمدی"
+                      className="w-full px-3 py-2 rounded-lg bg-[var(--bg)] border border-[var(--border)] focus:outline-none focus:border-[var(--accent)]"
+                    />
+                  </div>
+                  <div>
+                    <label className="block mb-1 font-medium">شماره تماس (همراه) *</label>
+                    <input
+                      type="text"
+                      required
+                      dir="ltr"
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value)}
+                      placeholder="09123456789"
+                      className="w-full px-3 py-2 rounded-lg bg-[var(--bg)] border border-[var(--border)] focus:outline-none focus:border-[var(--accent)]"
+                    />
+                  </div>
+                  <div>
+                    <label className="block mb-1 font-medium">ایمیل</label>
+                    <input
+                      type="email"
+                      dir="ltr"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder="user@example.com"
+                      className="w-full px-3 py-2 rounded-lg bg-[var(--bg)] border border-[var(--border)] focus:outline-none focus:border-[var(--accent)]"
+                    />
+                  </div>
+                  <div>
+                    <label className="block mb-1 font-medium">شناسه تلگرام</label>
+                    <input
+                      type="text"
+                      dir="ltr"
+                      value={telegramId}
+                      onChange={(e) => setTelegramId(e.target.value)}
+                      placeholder="@username"
+                      className="w-full px-3 py-2 rounded-lg bg-[var(--bg)] border border-[var(--border)] focus:outline-none focus:border-[var(--accent)]"
+                    />
+                  </div>
+                </div>
+
+                {/* کادر اطلاعات پرداخت */}
+                <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-xs space-y-2">
+                  <div className="font-semibold text-amber-300 flex items-center justify-between">
+                    <span>💳 اطلاعات واریز وجه بوت‌کمپ</span>
+                    <span className="text-sm font-bold text-white">{PAYMENT_INFO.feeText}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-xs pt-1 border-t border-amber-500/20">
+                    <span>شماره کارت:</span>
+                    <span className="font-mono font-bold tracking-wider select-all text-sm text-white">
+                      {PAYMENT_INFO.cardNumber}
+                    </span>
+                  </div>
+                  <div className="text-[11px] opacity-75">به نام: {PAYMENT_INFO.cardHolder}</div>
+                </div>
+
+                {/* اطلاعات واریز و آپلود فیش */}
+                <div className="space-y-3 text-xs">
+                  <div>
+                    <label className="block mb-1 font-medium">۴ رقم آخر کارت واریزکننده / شماره پیگیری</label>
+                    <input
+                      type="text"
+                      dir="ltr"
+                      maxLength={16}
+                      value={cardLastDigits}
+                      onChange={(e) => setCardLastDigits(e.target.value)}
+                      placeholder="مثلاً ۱۲۳۴"
+                      className="w-full px-3 py-2 rounded-lg bg-[var(--bg)] border border-[var(--border)] focus:outline-none focus:border-[var(--accent)]"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block mb-1 font-medium">تصویر رسید پرداخت (فیش واریزی)</label>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleFileChange}
+                      className="w-full text-xs text-slate-400 file:mr-2 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-[var(--surface-hover)] file:text-[var(--text)] hover:file:bg-[var(--accent)] hover:file:text-white cursor-pointer"
+                    />
+                    {receiptPreview && (
+                      <div className="mt-2 relative w-24 h-24 rounded-lg overflow-hidden border border-[var(--border)]">
+                        <img src={receiptPreview} alt="پیش‌نمایش رسید" className="w-full h-full object-cover" />
+                      </div>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="block mb-1 font-medium">توضیحات یا یادداشت (اختیاری)</label>
+                    <textarea
+                      rows={2}
+                      value={notes}
+                      onChange={(e) => setNotes(e.target.value)}
+                      placeholder="اگر توضیح خاصی دارید بنویسید..."
+                      className="w-full px-3 py-2 rounded-lg bg-[var(--bg)] border border-[var(--border)] focus:outline-none focus:border-[var(--accent)] text-xs"
+                    />
+                  </div>
+                </div>
+
+                {/* دکمه نهایی */}
+                <div className="pt-2 flex justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={handleCloseModal}
+                    className="px-4 py-2 rounded-lg text-xs font-semibold bg-[var(--surface)] hover:bg-[var(--surface-hover)] border border-[var(--border)]"
+                  >
+                    انصراف
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={submitting}
+                    className="px-6 py-2 rounded-lg text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white flex items-center gap-1 shadow"
+                  >
+                    {submitting ? "در حال ثبت و ارسال..." : "ثبت نهایی و ارسال رسید"}
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

@@ -86,3 +86,39 @@ export const bootcampMediaUpload = multer({
     cb(null, true);
   },
 });
+
+// Teaser video upload for hero section (up to 60MB, matching nginx)
+export const heroVideoUpload = multer({
+  storage,
+  limits: { fileSize: 60 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    const allowedMimes = ["video/mp4", "video/webm", "video/ogg", "video/quicktime"];
+    if (allowedMimes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error("فقط فرمت‌های ویدیویی (MP4, WebM, QuickTime) مجاز هستند"));
+    }
+  },
+});
+
+// Business Showcase (ویترین کسب‌وکارها) — video intro upload.
+// Dedicated uploader so the 50MB / 60s policy stays isolated from
+// other modules and can be tuned without touching them.
+const BUSINESS_VIDEO_ALLOWED_MIME_TYPES = [
+  "video/mp4",
+  "video/webm",
+  "video/quicktime",
+];
+const BUSINESS_VIDEO_MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024; // 50MB
+
+export const businessVideoUpload = multer({
+  storage,
+  limits: { fileSize: BUSINESS_VIDEO_MAX_FILE_SIZE_BYTES },
+  fileFilter: (_req, file, cb) => {
+    if (!BUSINESS_VIDEO_ALLOWED_MIME_TYPES.includes(file.mimetype)) {
+      cb(new Error("نوع فایل مجاز نیست. فقط ویدیو با فرمت MP4، WebM یا MOV مجاز است."));
+      return;
+    }
+    cb(null, true);
+  },
+});

@@ -66,16 +66,25 @@ export const loginSchema = z.object({
 export const verifyEmailSchema = z.object({
   body: z.object({
     email: z.string().trim().toLowerCase().email(),
+    password: z.string().min(6).optional(),
     code: z
       .string()
       .transform(normalizeDigits)
       .refine((c) => /^\d{6}$/.test(c), "کد تأیید باید ۶ رقم باشد"),
+    firstName: z.string().trim().min(2, "نام باید حداقل ۲ حرف باشد").max(60).optional(),
+    lastName: z.string().trim().min(2, "نام خانوادگی باید حداقل ۲ حرف باشد").max(60).optional(),
+    telegramPhone: z
+      .string()
+      .optional()
+      .transform((val) => (val ? normalizeIranPhone(val) : undefined))
+      .refine((val) => !val || /^09\d{9}$/.test(val), "شماره تلگرام باید یک موبایل ایران معتبر باشد"),
   }),
 });
 
 export const verifyPhoneSchema = z.object({
   body: z.object({
     phone: z.string().transform(normalizeIranPhone),
+    password: z.string().min(6).optional(),
     code: z
       .string()
       .transform(normalizeDigits)
@@ -101,7 +110,8 @@ export const requestPasswordResetSchema = z.object({
 
 export const resetPasswordSchema = z.object({
   email: z.string().email("ایمیل معتبر نیست."),
-  code: z.string().min(4, "کد بازیابی نامعتبر است.").max(10),
+  password: z.string().min(6).optional(),
+    code: z.string().min(4, "کد بازیابی نامعتبر است.").max(10),
   newPassword: z.string().min(8, "رمز عبور جدید باید حداقل ۸ کاراکتر باشد."),
 });
 

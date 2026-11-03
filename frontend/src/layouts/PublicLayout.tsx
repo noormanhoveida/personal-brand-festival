@@ -1,14 +1,22 @@
 import { Link, Outlet } from "react-router-dom";
-import { useState } from "react";
+import { useState , useEffect} from "react";
 import { AnimatePresence, motion } from "framer-motion";
+import { UnifiedRegisterModal } from "../components/UnifiedRegisterModal";
 
 export function PublicLayout() {
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const hasToken = Boolean(localStorage.getItem("token") || localStorage.getItem("auth_token"));
+  const [showRegisterModal, setShowRegisterModal] = useState(false);
+
+  useEffect(() => {
+    const handleOpen = () => setShowRegisterModal(true);
+    window.addEventListener("open-unified-register", handleOpen);
+    return () => window.removeEventListener("open-unified-register", handleOpen);
+  }, []);
+  const hasToken = typeof window !== "undefined" && !!localStorage.getItem("token");
 
   return (
-    <div className="flex min-h-screen flex-col">
-      {/* Mobile drawer */}
+    <div className="min-h-screen flex flex-col font-sans" dir="rtl">
+      {/* Mobile Drawer */}
       <AnimatePresence>
         {drawerOpen && (
           <>
@@ -17,46 +25,51 @@ export function PublicLayout() {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setDrawerOpen(false)}
-              className="fixed inset-0 z-[90] bg-black/50 md:hidden"
+              className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm md:hidden"
             />
             <motion.aside
               initial={{ x: "100%" }}
               animate={{ x: 0 }}
               exit={{ x: "100%" }}
               transition={{ type: "tween", duration: 0.25 }}
-              className="fixed inset-y-0 right-0 z-[100] flex w-[85vw] max-w-[320px] flex-col gap-3 overflow-y-auto px-4 py-6 md:hidden shadow-2xl"
-              style={{ backgroundColor: "var(--bg-secondary)" }}
+              className="fixed inset-y-0 right-0 z-50 w-72 p-6 flex flex-col justify-between shadow-2xl md:hidden border-l"
+              style={{ backgroundColor: "var(--bg-secondary)", borderColor: "var(--surface)" }}
             >
-              <button onClick={() => setDrawerOpen(false)} className="mb-2 self-start text-sm opacity-70">
-                ✕ بستن
-              </button>
-              <Link onClick={() => setDrawerOpen(false)} to="/" className="py-2 opacity-80 hover:opacity-100">صفحه اصلی</Link>
-              <Link onClick={() => setDrawerOpen(false)} to="/community" className="py-2 opacity-80 hover:opacity-100">شرکت کنندگان</Link>
-              <Link onClick={() => setDrawerOpen(false)} to="/network" className="py-2 opacity-80 hover:opacity-100 font-bold" style={{ color: "var(--accent)" }}>شبکه ارتباطی</Link>
-              <Link onClick={() => setDrawerOpen(false)} to="/showcase" className="py-2 opacity-80 hover:opacity-100">برترین های جشنواره</Link>
-              <Link onClick={() => setDrawerOpen(false)} to="/dashboard/bootcamps" className="py-2 opacity-80 hover:opacity-100">بوت‌کمپ‌ها / آکادمی</Link>
+              <div className="flex flex-col gap-4">
+                <div className="flex items-center justify-between pb-4 border-b" style={{ borderColor: "var(--surface)" }}>
+                  <span className="font-bold text-lg" style={{ color: "var(--accent)" }}>منوی دسترسی</span>
+                  <button onClick={() => setDrawerOpen(false)} className="p-1 opacity-70 hover:opacity-100 text-lg">✕</button>
+                </div>
+                <nav className="flex flex-col gap-2 text-sm">
+                  <Link onClick={() => setDrawerOpen(false)} to="/" className="py-2 opacity-80 hover:opacity-100">صفحه اصلی</Link>
+                  <Link onClick={() => setDrawerOpen(false)} to="/community" className="py-2 opacity-80 hover:opacity-100">شرکت کنندگان</Link>
+                  <Link onClick={() => setDrawerOpen(false)} to="/network" className="py-2 opacity-80 hover:opacity-100 font-bold" style={{ color: "var(--accent)" }}>شبکه ارتباطی</Link>
+                  <Link onClick={() => setDrawerOpen(false)} to="/showcase" className="py-2 opacity-80 hover:opacity-100">برترین های جشنواره</Link>
+                  <Link onClick={() => setDrawerOpen(false)} to="/business-showcase" className="py-2 opacity-80 hover:opacity-100 font-medium text-emerald-400">ویترین کسب‌وکارها</Link>
+                  <Link onClick={() => setDrawerOpen(false)} to="/dashboard/bootcamps" className="py-2 opacity-80 hover:opacity-100">بوت‌کمپ‌ها / آکادمی</Link>
+                </nav>
+              </div>
 
-              <div className="mt-4 border-t pt-4" style={{ borderColor: "var(--surface)" }}>
+              <div className="pt-4 border-t flex flex-col gap-2 text-sm" style={{ borderColor: "var(--surface)" }}>
                 {hasToken ? (
                   <Link
                     onClick={() => setDrawerOpen(false)}
                     to="/dashboard"
-                    className="inline-flex w-full items-center justify-center rounded-full px-4 py-2 font-medium transition hover:opacity-90"
+                    className="w-full text-center rounded-full py-2.5 font-medium transition hover:opacity-90"
                     style={{ backgroundColor: "var(--accent)", color: "var(--bg)" }}
                   >
                     پروفایل من
                   </Link>
                 ) : (
                   <div className="flex flex-col gap-2">
-                    <Link onClick={() => setDrawerOpen(false)} to="/login" className="py-2 text-center opacity-80">ورود</Link>
-                    <Link
-                      onClick={() => setDrawerOpen(false)}
-                      to="/register"
+                    <Link onClick={() => setDrawerOpen(false)} to="/login" className="py-2 text-center opacity-80 hover:opacity-100">ورود</Link>
+                    <button
+                      onClick={() => { setDrawerOpen(false); setShowRegisterModal(true); }}
                       className="inline-flex w-full items-center justify-center rounded-full px-4 py-2 font-medium transition hover:opacity-90 text-center"
                       style={{ backgroundColor: "var(--accent)", color: "var(--bg)" }}
                     >
                       ثبت‌نام
-                    </Link>
+                    </button>
                   </div>
                 )}
               </div>
@@ -75,6 +88,7 @@ export function PublicLayout() {
           <Link to="/community" className="opacity-80 hover:opacity-100">شرکت کنندگان</Link>
           <Link to="/network" className="opacity-80 hover:opacity-100">شبکه ارتباطی</Link>
           <Link to="/showcase" className="opacity-80 hover:opacity-100">برترین های جشنواره</Link>
+          <Link to="/business-showcase" className="opacity-80 hover:opacity-100 font-medium text-emerald-400">ویترین کسب‌وکارها</Link>
           <Link to="/dashboard/bootcamps" className="opacity-80 hover:opacity-100">بوت‌کمپ‌ها / آکادمی</Link>
           {hasToken ? (
             <Link
@@ -87,13 +101,13 @@ export function PublicLayout() {
           ) : (
             <>
               <Link to="/login" className="opacity-80 hover:opacity-100">ورود</Link>
-              <Link
-                to="/register"
+              <button
+                onClick={() => setShowRegisterModal(true)}
                 className="rounded-full px-4 py-2 font-medium transition hover:opacity-90"
                 style={{ backgroundColor: "var(--accent)", color: "var(--bg)" }}
               >
                 ثبت‌نام
-              </Link>
+              </button>
             </>
           )}
         </nav>
@@ -112,9 +126,14 @@ export function PublicLayout() {
         <Outlet />
       </main>
 
-      <footer className="px-6 py-8 text-center text-xs md:px-12" style={{ color: "var(--text)", opacity: 0.6 }}>
-        جشنواره بار دانش با محوریت برند سازی شخصی
+      <footer className="border-t py-6 text-center text-xs opacity-60" style={{ borderColor: "var(--surface)" }}>
+        © تمام حقوق برای جشنواره برند شخصی محفوظ است.
       </footer>
+
+      <UnifiedRegisterModal
+        open={showRegisterModal}
+        onClose={() => setShowRegisterModal(false)}
+      />
     </div>
   );
 }

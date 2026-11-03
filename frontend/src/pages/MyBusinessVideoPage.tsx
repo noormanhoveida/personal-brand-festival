@@ -132,7 +132,7 @@ export function MyBusinessVideoPage() {
         ownerName: ownerName.trim(),
         category,
         videoUrl: uploadRes.videoUrl,
-        durationSeconds: durationSeconds || 0,
+        durationSeconds: Math.round(durationSeconds || 0),
         fileSizeBytes: uploadRes.fileSizeBytes || selectedFile.size,
         description: description.trim() || null,
         websiteUrl: websiteUrl.trim() || null,
@@ -316,10 +316,11 @@ export function MyBusinessVideoPage() {
             <div>
               <label className="block text-xs font-medium text-neutral-300">آدرس وب‌سایت</label>
               <input
-                type="url"
+                type="text"
+                inputMode="url"
                 value={websiteUrl}
                 onChange={(e) => setWebsiteUrl(e.target.value)}
-                placeholder="https://example.com"
+                placeholder="www.pbfestival.ir یا https://pbfestival.ir"
                 dir="ltr"
                 className="mt-1.5 w-full rounded-xl border border-neutral-700 bg-neutral-800/80 px-3.5 py-2.5 text-sm text-white placeholder-neutral-500 focus:border-amber-500 focus:outline-none"
               />

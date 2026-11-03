@@ -1,0 +1,99 @@
+import { useState } from "react";
+import { useNavigate, Link, useSearchParams } from "react-router-dom";
+import { useAppDispatch } from "../hooks/redux";
+import { setSession } from "../features/auth/authSlice";
+import { login } from "../api/auth";
+
+export function LoginPage() {
+  const dispatch = useAppDispatch();
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const redirectUrl = searchParams.get("redirect") || "/dashboard";
+
+  const [identifier, setIdentifier] = useState("");
+  const [password, setPassword] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [serverError, setServerError] = useState<string | null>(null);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setServerError(null);
+    setIsSubmitting(true);
+
+    try {
+      const { accessToken, role } = await login(identifier.trim(), password);
+      dispatch(setSession({ accessToken, role }));
+      navigate(redirectUrl);
+    } catch (err: any) {
+      const data = err?.response?.data;
+      if (data?.needsVerification) {
+        navigate("/verify-email", {
+          state: {
+            channel: data.channel,
+            contact: data.contact,
+          },
+        });
+        return;
+      }
+      setServerError(data?.message ?? "نام کاربری یا رمز عبور اشتباه است.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="mx-auto flex max-w-sm flex-col gap-4 px-6 py-24">
+      <h1 className="text-2xl font-bold">ورود</h1>
+
+      <form onSubmit={handleSubmit} className="flex flex-col gap-3">
+        <div>
+          <input
+            type="text"
+            dir="ltr"
+            value={identifier}
+            onChange={(e) => setIdentifier(e.target.value)}
+            placeholder="ایمیل یا شماره موبایل"
+            required
+            className="w-full rounded-lg px-4 py-3 text-right"
+            style={{ backgroundColor: "var(--surface)" }}
+          />
+        </div>
+
+        <div>
+          <input
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="رمز عبور"
+            required
+            className="w-full rounded-lg px-4 py-3"
+            style={{ backgroundColor: "var(--surface)" }}
+          />
+        </div>
+        <div className="text-left">
+          <Link to="/forgot-password" className="text-xs opacity-75 hover:opacity-100" style={{ color: "var(--accent)" }}>
+            رمز عبور را فراموش کرده‌اید؟
+          </Link>
+        </div>
+
+        {serverError && <p className="text-sm text-red-400">{serverError}</p>}
+
+        <button
+          type="submit"
+          disabled={isSubmitting}
+          className="mt-2 rounded-full py-3 font-semibold disabled:opacity-50"
+          style={{ backgroundColor: "var(--accent)", color: "var(--bg)" }}
+        >
+          {isSubmitting ? "در حال ورود..." : "ورود"}
+        </button>
+      </form>
+
+      <p className="text-center text-sm opacity-70">
+        حساب ندارید؟{" "}
+        <Link to="/register" style={{ color: "var(--accent)" }}>
+          ثبت‌نام کنید
+        </Link>
+      </p>
+    </div>
+  );
+}

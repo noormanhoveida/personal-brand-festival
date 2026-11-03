@@ -10,6 +10,7 @@ const userSelect = {
     select: {
       firstName: true,
       lastName: true,
+      slug: true,
     },
   },
 };
@@ -294,6 +295,47 @@ export class BusinessShowcaseService {
       },
     };
   }
+
+  /**
+   * دریافت لیست کاربران لایک‌کننده ویدیو
+   */
+  async getLikes(videoId: string) {
+    const video = await prisma.businessVideo.findUnique({ where: { id: videoId } });
+    if (!video) throw new Error("ویدیو یافت نشد.");
+
+    const likes = await prisma.businessVideoLike.findMany({
+      where: { videoId },
+      include: {
+        user: {
+          select: {
+            id: true,
+            participantProfile: {
+              select: {
+                firstName: true,
+                lastName: true,
+                slug: true,
+                media: {
+                  select: { url: true },
+                  take: 1,
+                  orderBy: { createdAt: "asc" },
+                },
+              },
+            },
+          },
+        },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+
+    return likes.map((l) => ({
+      id: l.user.id,
+      firstName: l.user.participantProfile?.firstName || "کاربر",
+      lastName: l.user.participantProfile?.lastName || "",
+      slug: l.user.participantProfile?.slug || "",
+      avatarUrl: l.user.participantProfile?.media?.[0]?.url || null,
+    }));
+  }
+
 }
 
 export const businessShowcaseService = new BusinessShowcaseService();

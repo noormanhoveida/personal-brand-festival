@@ -30,6 +30,9 @@ const attachSchema = z.object({ questionId: z.string().uuid() });
 const router = Router();
 const canManage = requireRole(Role.BOOTCAMP_MANAGER, Role.ADMIN);
 
+// Public route for landing page & registration modal (No auth required)
+router.get("/public/list", list);
+
 router.use(requireAuth);
 
 router.get("/", list);

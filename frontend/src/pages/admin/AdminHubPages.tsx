@@ -1,0 +1,265 @@
+import React from "react";
+import { Link } from "react-router-dom";
+import { Card } from "../../components/ui";
+
+interface HubItem {
+  to: string;
+  title: string;
+  desc: string;
+  icon: string;
+  badge?: string;
+}
+
+function HubTemplate({
+  title,
+  subtitle,
+  items,
+}: {
+  title: string;
+  subtitle: string;
+  items: HubItem[];
+}) {
+  return (
+    <div className="space-y-6">
+      <div className="border-b pb-4" style={{ borderColor: "var(--surface)" }}>
+        <h1 className="text-2xl font-black text-amber-500">{title}</h1>
+        <p className="mt-1 text-sm opacity-70">{subtitle}</p>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {items.map((item) => (
+          <Link key={item.to} to={item.to} className="group block focus:outline-none">
+            <Card className="h-full p-5 transition-all duration-200 hover:-translate-y-1 hover:border-amber-500/50 hover:shadow-lg flex flex-col justify-between">
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-3xl p-2.5 rounded-xl bg-amber-500/10 text-amber-500 group-hover:scale-110 transition-transform">
+                    {item.icon}
+                  </span>
+                  {item.badge && (
+                    <span className="text-xs px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-400 font-medium">
+                      {item.badge}
+                    </span>
+                  )}
+                </div>
+                <h3 className="font-bold text-base group-hover:text-amber-400 transition-colors">
+                  {item.title}
+                </h3>
+                <p className="mt-2 text-xs opacity-70 leading-relaxed">
+                  {item.desc}
+                </p>
+              </div>
+              <div className="mt-4 pt-3 border-t border-white/5 flex items-center justify-between text-xs text-amber-500 font-semibold">
+                <span>ورود به بخش</span>
+                <span className="transform group-hover:-translate-x-1 transition-transform">←</span>
+              </div>
+            </Card>
+          </Link>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ۱. مدیریت سایت
+export function AdminSiteHubPage() {
+  const items: HubItem[] = [
+    {
+      to: "/dashboard/tickets",
+      title: "چت و پشتیبانی",
+      desc: "رسیدگی به تیکت‌های ارسالی کاربران و پاسخ به درخواست‌های پشتیبانی فستیوال",
+      icon: "💬",
+    },
+    {
+      to: "/dashboard/announcements",
+      title: "اطلاعیه‌ها",
+      desc: "انتشار اطلاعیه‌ها و پیام‌های عمومی برای شرکت‌کنندگان و داوران",
+      icon: "📢",
+    },
+    {
+      to: "/dashboard/admin/sponsors",
+      title: "مدیریت اسپانسرها",
+      desc: "مدیریت و ثبت حامیان مالی، غرفه‌ها و قراردادهای فستیوال",
+      icon: "🤝",
+    },
+    {
+      to: "/dashboard/admin/users",
+      title: "کاربران",
+      desc: "مدیریت کاربران، تغییر نقش‌ها و کنترل دسترسی‌های کل سیستم",
+      icon: "👥",
+    },
+    {
+      to: "/dashboard/admin/regions",
+      title: "مناطق",
+      desc: "تعریف و مدیریت مناطق، دانشگاه‌ها و حوزه‌های منطقه‌ای شرکت‌کنندگان",
+      icon: "🗺️",
+    },
+    {
+      to: "/dashboard/admin/analytics",
+      title: "آنالیتیکس",
+      desc: "تحلیل آمار پلتفرم، نمودارهای ثبت‌نام، مشارکت و رشد مخاطبان",
+      icon: "📈",
+    },
+    {
+      to: "/dashboard/admin/landing",
+      title: "مدیریت صفحه اصلی",
+      desc: "ویرایش محتوا، ساختار بخش‌ها و ویدیوهای لندینگ پیج فستیوال",
+      icon: "🌐",
+    },
+    {
+      to: "/dashboard/admin/guides",
+      title: "مدیریت راهنماها (Guides)",
+      desc: "تعریف اسلایدهای راهنمای خوش‌آمدگویی و آموزشی برای صفحات مختلف سایت",
+      icon: "🧭",
+      badge: "جدید",
+    },
+  ];
+
+  return (
+    <HubTemplate
+      title="مرکز مدیریت پلتفرم و سایت"
+      subtitle="تنظیمات زیرساختی، محتوای عمومی، ارتباطات کاربران و راهنماها"
+      items={items}
+    />
+  );
+}
+
+// ۲. مدیریت ارزیابی
+export function AdminEvaluationHubPage() {
+  const items: HubItem[] = [
+    {
+      to: "/dashboard/admin/pre-assessment",
+      title: "پیش‌ارزیابی",
+      desc: "بررسی و نتایج پرسش‌نامه‌های پیش‌ارزیابی اولیه شرکت‌کنندگان",
+      icon: "📝",
+    },
+    {
+      to: "/dashboard/admin/assignments",
+      title: "تخصیص ارزیاب",
+      desc: "تخصیص هوشمند یا دستی شرکت‌کنندگان به داوران و ارزیابان فستیوال",
+      icon: "🎯",
+    },
+    {
+      to: "/dashboard/admin/criteria",
+      title: "معیارهای ارزیابی",
+      desc: "تعریف و تنظیم شاخص‌ها، اوزان و ماتریس‌های نمره‌دهی داوری",
+      icon: "⚖️",
+    },
+    {
+      to: "/dashboard/admin/forms",
+      title: "فرم‌ساز و نظرسنجی",
+      desc: "طراحی فرم‌های پویا، پرسش‌نامه‌های ارزیابی و نظرسنجی‌های ادواری",
+      icon: "📋",
+    },
+    {
+      to: "/dashboard/admin/participants",
+      title: "شرکت‌کنندگان",
+      desc: "لیست جامع شرکت‌کنندگان، وضعیت ارزیابی و پروفایل تحول فردی",
+      icon: "🎓",
+    },
+  ];
+
+  return (
+    <HubTemplate
+      title="مرکز مدیریت ارزیابی و داوری"
+      subtitle="کنترل فرآیند پیش‌ارزیابی، داوران، شاخص‌های سنجش و فرم‌ها"
+      items={items}
+    />
+  );
+}
+
+// ۳. مدیریت آکادمی و بوت‌کمپ
+export function AdminAcademyHubPage() {
+  const items: HubItem[] = [
+    {
+      to: "/dashboard/admin/bootcamps",
+      title: "مدیریت بوت‌کمپ‌ها / آکادمی",
+      desc: "برنامه‌ریزی کارگاه‌ها، ثبت وبینارها، مدرسان و فایل‌های آموزشی هفتگی",
+      icon: "🎪",
+    },
+    {
+      to: "/dashboard/admin/journey",
+      title: "مدیریت مسیر برند",
+      desc: "تنظیم ایستگاه‌ها و مراحل گام‌به‌گام نقشه راه برند شخصی دانشجویان",
+      icon: "🚀",
+    },
+    {
+      to: "/dashboard/admin/situations",
+      title: "موقعیت‌ها و صفات",
+      desc: "مدیریت سناریوهای شبیه‌سازی رفتاری و ماتریس صفات هویتی",
+      icon: "🎭",
+    },
+    {
+      to: "/dashboard/admin/challenges",
+      title: "چالش‌های هفتگی",
+      desc: "طراحی، انتشار و زمان‌بندی چالش‌های تعاملی هفتگی آکادمی",
+      icon: "⚡",
+    },
+  ];
+
+  return (
+    <HubTemplate
+      title="مرکز مدیریت آکادمی و بوت‌کمپ‌ها"
+      subtitle="مدیریت دوره‌های آموزشی، سناریوهای مهارتی، مسیر برند و چالش‌ها"
+      items={items}
+    />
+  );
+}
+
+// ۴. مدیریت علمی
+export function AdminScienceHubPage() {
+  const items: HubItem[] = [
+    {
+      to: "/dashboard/admin/artifacts",
+      title: "مدیریت آثار",
+      desc: "بررسی، دسته‌بندی و کنترل کیفیت آثار و ارائه‌های ارسالی فستیوال",
+      icon: "🏆",
+    },
+    {
+      to: "/dashboard/leaderboards",
+      title: "تابلوهای امتیاز",
+      desc: "مشاهده رتبه‌بندی زنده، لیگ امتیازات شرکت‌کنندگان و مناطق",
+      icon: "🥇",
+    },
+    {
+      to: "/dashboard/admin/showcase",
+      title: "ویترین فستیوال",
+      desc: "مدیریت آثار منتخب و برگزیده برای نمایش عمومی در ویترین ملی",
+      icon: "✨",
+    },
+  ];
+
+  return (
+    <HubTemplate
+      title="مرکز مدیریت علمی و نتایج"
+      subtitle="نظارت بر تولیدات، رده‌بندی ملی امتیازات و منتخبان نهایی ویترین"
+      items={items}
+    />
+  );
+}
+
+// ۵. مدیریت اقتصادی
+export function AdminEconomyHubPage() {
+  const items: HubItem[] = [
+    {
+      to: "/dashboard/admin/business-showcase",
+      title: "مدیریت ویترین کسب‌وکارها",
+      desc: "بررسی، تایید و نظارت بر ویدیوهای ۶۰ ثانیه‌ای ارسالی اعضا برای معرفی کسب‌وکار",
+      icon: "🎬",
+      badge: "جدید",
+    },
+    {
+      to: "/dashboard/admin/sponsors",
+      title: "مدیریت اسپانسرها و غرفه‌ها",
+      desc: "رسیدگی به حامیان مالی، بسته‌های تجاری و تعاملات اقتصادی فستیوال",
+      icon: "💼",
+    },
+  ];
+
+  return (
+    <HubTemplate
+      title="مرکز مدیریت اقتصادی و تجاری"
+      subtitle="نظارت بر ویترین کسب‌وکارها، تعاملات مالی، حامیان و فرصت‌های تجاری"
+      items={items}
+    />
+  );
+}

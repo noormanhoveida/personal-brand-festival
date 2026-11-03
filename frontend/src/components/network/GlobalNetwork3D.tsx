@@ -208,6 +208,10 @@ const GlobalNetwork3D: React.FC = () => {
         }
       });
 
+    // تنظیم فیزیک 3بعدی برای فاصله گرفتن نودها و جلوگیری از مچالگی
+    Graph.d3Force('charge')?.strength(-180);
+    Graph.d3Force('link')?.distance(110);
+
     const resizeObserver = new ResizeObserver(() => {
       if (containerRef.current && Graph) {
         Graph.width(containerRef.current.clientWidth);

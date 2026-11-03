@@ -1,0 +1,82 @@
+import { Request, Response } from "express";
+import { ChatService } from "./chat.service";
+
+export class ChatController {
+  static async getMe(req: Request, res: Response) {
+    try {
+      const userId = (req as any).user?.id || (req as any).user?.userId;
+      if (!userId) return res.status(401).json({ success: false, message: "احراز هویت نشده‌اید" });
+      const user = await ChatService.getCurrentUser(userId);
+      return res.json({ success: true, data: user });
+    } catch (err: any) {
+      return res.status(400).json({ success: false, message: err.message });
+    }
+  }
+
+  static async searchUsers(req: Request, res: Response) {
+    try {
+      const currentUserId = (req as any).user?.id || (req as any).user?.userId;
+      if (!currentUserId) return res.status(401).json({ success: false, message: "احراز هویت نشده‌اید" });
+
+      const search = typeof req.query.search === "string" ? req.query.search.slice(0, 80) : "";
+      const rawPage = Number(req.query.page);
+      const page = Number.isSafeInteger(rawPage) && rawPage > 0 ? Math.min(rawPage, 100000) : 1;
+      const users = await ChatService.searchUsers(currentUserId, search, page);
+      return res.json({ success: true, data: users });
+    } catch (err: any) {
+      return res.status(400).json({ success: false, message: err.message });
+    }
+  }
+
+  static async getConversations(req: Request, res: Response) {
+    try {
+      const currentUserId = (req as any).user?.id || (req as any).user?.userId;
+      if (!currentUserId) return res.status(401).json({ success: false, message: "احراز هویت نشده‌اید" });
+
+      const convs = await ChatService.getConversations(currentUserId);
+      return res.json({ success: true, data: convs });
+    } catch (err: any) {
+      return res.status(400).json({ success: false, message: err.message });
+    }
+  }
+
+  static async getUnreadCount(req: Request, res: Response) {
+    try {
+      const currentUserId = (req as any).user?.id || (req as any).user?.userId;
+      if (!currentUserId) {
+        return res.status(401).json({ success: false, message: "احراز هویت نشده‌اید" });
+      }
+
+      const count = await ChatService.getUnreadCount(currentUserId);
+      return res.json({ success: true, data: { count } });
+    } catch (err: any) {
+      return res.status(400).json({ success: false, message: err.message });
+    }
+  }
+
+  static async getMessages(req: Request, res: Response) {
+    try {
+      const currentUserId = (req as any).user?.id || (req as any).user?.userId;
+      const { otherUserId } = req.params;
+      if (!currentUserId) return res.status(401).json({ success: false, message: "احراز هویت نشده‌اید" });
+
+      const messages = await ChatService.getMessages(currentUserId, otherUserId);
+      return res.json({ success: true, data: messages });
+    } catch (err: any) {
+      return res.status(400).json({ success: false, message: err.message });
+    }
+  }
+
+  static async sendMessage(req: Request, res: Response) {
+    try {
+      const currentUserId = (req as any).user?.id || (req as any).user?.userId;
+      const { receiverId, content } = req.body;
+      if (!currentUserId) return res.status(401).json({ success: false, message: "احراز هویت نشده‌اید" });
+
+      const message = await ChatService.sendMessage(currentUserId, receiverId, content);
+      return res.json({ success: true, data: message });
+    } catch (err: any) {
+      return res.status(400).json({ success: false, message: err.message });
+    }
+  }
+}

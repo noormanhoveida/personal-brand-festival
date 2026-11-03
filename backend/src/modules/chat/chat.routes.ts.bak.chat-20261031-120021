@@ -1,0 +1,18 @@
+import { Router } from "express";
+import { ChatController } from "./chat.controller";
+import { requireAuth } from "../../middleware/auth.middleware";
+
+const router = Router();
+
+router.use(requireAuth);
+
+router.get("/users", ChatController.searchUsers);
+router.get("/conversations", ChatController.getConversations);
+
+// هر دو فرمت آدرس چت برای سازگاری کامل
+router.get("/messages/:otherUserId", ChatController.getMessages);
+router.get("/conversations/:otherUserId/messages", ChatController.getMessages);
+
+router.post("/send", ChatController.sendMessage);
+
+export default router;

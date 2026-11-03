@@ -85,7 +85,7 @@ export class NetworkGraphService {
   }
 
   /**
-   * دریافت گراف محلی ۲ سطحی برای کاربر احرازشده
+   * دریافت ارتباط‌های مستقیم کاربر احرازشده
    */
   static async getMyNetworkGraph(participantId: string): Promise<GraphData> {
     const feedbackItems = await prisma.feedbackResponse.findMany({
@@ -102,46 +102,34 @@ export class NetworkGraphService {
       },
     });
 
-    const adjacency = new Map<string, Set<string>>();
-    const linkMap = new Map<string, number>();
-
-    const addEdge = (u: string, v: string) => {
-      if (!adjacency.has(u)) adjacency.set(u, new Set());
-      if (!adjacency.has(v)) adjacency.set(v, new Set());
-      adjacency.get(u)!.add(v);
-      adjacency.get(v)!.add(u);
-
-      const linkKey = `${u}->${v}`;
-      linkMap.set(linkKey, (linkMap.get(linkKey) || 0) + 1);
-    };
+    // فقط ارتباط‌هایی که یک سرشان کاربر فعلی است.
+    const directNodeIds = new Set<string>([participantId]);
+    const directLinkMap = new Map<string, number>();
 
     for (const item of feedbackItems) {
-      const src = item.authorParticipantId;
-      const dst = item.request?.requesterId;
-      if (src && dst && src !== dst) {
-        addEdge(src, dst);
-      }
+      const source = item.authorParticipantId;
+      const target = item.request?.requesterId;
+
+      if (!source || !target || source === target) continue;
+      if (source !== participantId && target !== participantId) continue;
+
+      const connectedParticipantId =
+        source === participantId ? target : source;
+
+      directNodeIds.add(connectedParticipantId);
+
+      // هر ارتباط مستقیم، صرف‌نظر از جهت بازخورد، یک لینک محسوب می‌شود.
+      const linkKey = [participantId, connectedParticipantId]
+        .sort()
+        .join("->");
+
+      directLinkMap.set(
+        linkKey,
+        (directLinkMap.get(linkKey) || 0) + 1
+      );
     }
 
-    const levelMap = new Map<string, number>();
-    levelMap.set(participantId, 0);
-
-    const queue: Array<{ id: string; depth: number }> = [{ id: participantId, depth: 0 }];
-
-    while (queue.length > 0) {
-      const current = queue.shift()!;
-      if (current.depth >= 2) continue;
-
-      const neighbors = adjacency.get(current.id) || new Set();
-      for (const neighbor of neighbors) {
-        if (!levelMap.has(neighbor)) {
-          levelMap.set(neighbor, current.depth + 1);
-          queue.push({ id: neighbor, depth: current.depth + 1 });
-        }
-      }
-    }
-
-    const includedNodeIds = Array.from(levelMap.keys());
+    const includedNodeIds = Array.from(directNodeIds);
 
     const participants = await prisma.participantProfile.findMany({
       where: {
@@ -169,17 +157,14 @@ export class NetworkGraphService {
       slug: p.slug,
       avatarUrl: p.media?.[0]?.url || null,
       roleOrField: p.occupation || p.professionalField || null,
-      level: levelMap.get(p.id) ?? 2,
+      level: p.id === participantId ? 0 : 1,
     }));
 
-    const includedSet = new Set(includedNodeIds);
     const links: GraphLink[] = [];
 
-    linkMap.forEach((count, key) => {
+    directLinkMap.forEach((count, key) => {
       const [source, target] = key.split("->");
-      if (includedSet.has(source) && includedSet.has(target)) {
-        links.push({ source, target, count });
-      }
+      links.push({ source, target, count });
     });
 
     return { nodes, links };

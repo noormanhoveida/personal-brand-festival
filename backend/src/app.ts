@@ -1,4 +1,8 @@
-// import landingRoutes from "./routes/landing.routes";
+import chatRoutes from "./modules/chat/chat.routes";
+import bootcampRegistrationRoutes from "./modules/bootcamp-registration/bootcamp-registration.routes";
+import publicUpgradeRoutes from "./modules/bootcamp-registration/public-upgrade.routes";
+import sponsorRoutes from "./modules/sponsor/sponsor.routes";
+import landingRoutes from "./modules/landing/landing.routes";
 import express from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
@@ -17,8 +21,10 @@ import personalPageRoutes from "./modules/personal-page/personal-page.routes";
 import publicPageRoutes from "./modules/personal-page/public.routes";
 import analyticsRoutes from "./modules/analytics/analytics.routes";
 import showcaseRoutes from "./modules/showcase/showcase.routes";
+import businessShowcaseRoutes from "./modules/business-showcase/business-showcase.routes";
 import artifactRoutes from "./modules/artifact/artifact.routes";
 import mediaRoutes from "./modules/media/media.routes";
+import guideRoutes from "./modules/guide/guide.routes";
 import taskRoutes from "./modules/task/task.routes";
 import skillRoutes from "./modules/skill/skill.routes";
 import situationRoutes from "./modules/situation/situation.routes";
@@ -40,7 +46,7 @@ const app = express();
 app.use(
   cors({
     origin: [
-      env.frontendUrl, // http://185.231.112.9
+      env.frontendUrl,
       "http://bare-danesh.ir",
       "https://bare-danesh.ir",
       "http://www.bare-danesh.ir",
@@ -57,46 +63,48 @@ app.use(
 app.use(express.json());
 app.use(cookieParser());
 
-// Serves files saved by the local storage driver (spec §38) at the
-// same /uploads/<filename> URL saveUploadedMedia() generates.
 app.use("/uploads", express.static(uploadDirAbsolutePath));
-
 app.get("/health", (_req, res) => res.json({ status: "ok" }));
+app.get("/api/health", (_req, res) => res.json({ status: "ok" }));
 
-app.use("/auth", authRoutes);
-app.use("/admin", adminRoutes);
-app.use("/profile", profileRoutes);
-app.use("/regions", regionsRoutes);
-app.use("/journey", journeyRoutes);
-app.use("/bootcamps", bootcampRoutes);
-app.use("/responses", responseRoutes);
-app.use("/feedback", feedbackRoutes);
-app.use("/evaluations", evaluationRoutes);
-app.use("/personal-page", personalPageRoutes);
-app.use("/public", publicPageRoutes);
-app.use("/analytics", analyticsRoutes);
-app.use("/showcase", showcaseRoutes);
-app.use("/artifacts", artifactRoutes);
+app.use("/api/auth", authRoutes);
+app.use("/api/admin", adminRoutes);
+app.use("/api/profile", profileRoutes);
+app.use("/api/regions", regionsRoutes);
+app.use("/api/journey", journeyRoutes);
+app.use("/api/bootcamps", bootcampRoutes);
+app.use("/api/bootcamp-registrations", bootcampRegistrationRoutes);
+app.use("/api/bootcamp-registrations", publicUpgradeRoutes);
+app.use("/api/responses", responseRoutes);
+app.use("/api/feedback", feedbackRoutes);
+app.use("/api/evaluations", evaluationRoutes);
+app.use("/api/personal-page", personalPageRoutes);
+app.use("/api/public", publicPageRoutes);
+app.use("/api/analytics", analyticsRoutes);
+app.use("/api/showcase", showcaseRoutes);
+app.use("/api/business-showcase", businessShowcaseRoutes);
 app.use("/api/artifacts", artifactRoutes);
-app.use("/media", mediaRoutes);
-app.use("/skills", skillRoutes);
-app.use("/situations", situationRoutes);
-app.use("/traits", traitRoutes);
-app.use("/forms", formRoutes);
-app.use("/approval", approvalRoutes);
-app.use("/network-graph", networkGraphRoutes);
+app.use("/api/media", mediaRoutes);
+app.use("/api/guides", guideRoutes);
+app.use("/api/chat", chatRoutes);
+app.use("/api/skills", skillRoutes);
+app.use("/api/situations", situationRoutes);
+app.use("/api/traits", traitRoutes);
+app.use("/api/forms", formRoutes);
+app.use("/api/approval", approvalRoutes);
+app.use("/api/network-graph", networkGraphRoutes);
 
-app.use(taskRoutes);
-app.use(liveSessionRoutes);
-app.use(preAssessmentRoutes);
-app.use(leaderboardRoutes);
-app.use(challengeRoutes);
+app.use("/api", taskRoutes);
+app.use("/api", liveSessionRoutes);
+app.use("/api", preAssessmentRoutes);
+app.use("/api", leaderboardRoutes);
+app.use("/api", challengeRoutes);
 
-// app.use("/landing", landingRoutes);
-// app.use("/api/landing", landingRoutes);
-app.use("/tickets", authenticate, ticketRoutes);
-app.use("/announcements", announcementRoutes);
+app.use("/api/landing", landingRoutes);
+app.use("/api/tickets", authenticate, ticketRoutes);
+app.use("/api/announcements", announcementRoutes);
+app.use("/api/sponsors", sponsorRoutes);
+
 app.use(errorHandler);
-
 
 export default app;

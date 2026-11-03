@@ -90,7 +90,7 @@ export function LoginPage() {
 
       <p className="text-center text-sm opacity-70">
         حساب ندارید؟{" "}
-        <Link to="/register" style={{ color: "var(--accent)" }}>
+        <Link to="#" onClick={(e) => { e.preventDefault(); window.dispatchEvent(new CustomEvent("open-unified-register")); }} style={{ color: "var(--accent)" }}>
           ثبت‌نام کنید
         </Link>
       </p>

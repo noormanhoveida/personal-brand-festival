@@ -1,3 +1,5 @@
+import { SponsorBannerSlider } from "../components/SponsorBannerSlider";
+import { apiClient } from "../api/client";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { getProfile, ParticipantProfile } from "../api/profile";
@@ -8,6 +10,7 @@ import { getMyPoints } from "../api/approval";
 import { getMyPendingForms } from "../api/forms";
 import { motion } from "framer-motion";
 import { Card, Spinner } from "../components/ui";
+import { SPONSORS_DATA } from "../data/sponsorsData";
 import { ApprovedArtifactsCarousel } from "../components/ApprovedArtifactsCarousel";
 import { getApprovedArtifacts } from "../api/artifact";
 
@@ -22,6 +25,13 @@ export function DashboardHomePage() {
   const [approvedArtifacts, setApprovedArtifacts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadErrors, setLoadErrors] = useState<string[]>([]);
+
+  const [sponsors, setSponsors] = useState<any[]>([]);
+  useEffect(() => {
+    apiClient.get("/sponsors/public")
+      .then((res) => setSponsors(res.data?.data ?? []))
+      .catch(() => setSponsors([]));
+  }, []);
 
   useEffect(() => {
     Promise.allSettled([
@@ -169,6 +179,12 @@ export function DashboardHomePage() {
   return (
     <div className="space-y-6">
       
+
+      {/* بنر و اسلایدر اسپانسرها و حامیان */}
+      <div className="pt-2">
+        {sponsors.length > 0 && <SponsorBannerSlider sponsors={sponsors} />}
+      </div>
+
       {/* پیام خوش‌آمدگویی و هدایت اولیه */}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>

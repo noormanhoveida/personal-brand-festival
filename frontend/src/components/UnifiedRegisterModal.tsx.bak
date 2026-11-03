@@ -1,0 +1,413 @@
+import React, { useEffect, useMemo, useState } from "react";
+import { createBootcampRegistration } from "../api/bootcampRegistrations";
+import { apiClient } from "../api/client";
+
+type Bootcamp = {
+  id: string;
+  title: string;
+  status: "LOCKED" | "COMING_SOON" | "ACTIVE" | "DEADLINE_APPROACHING" | "SUBMITTED" | "COMPLETED";
+};
+
+type Props = {
+  open: boolean;
+  onClose: () => void;
+  preselectBootcampId?: string;
+};
+
+type Step = "ACCOUNT" | "VERIFY" | "BOOTCAMPS";
+
+const STATUS_LABEL: Record<Bootcamp["status"], string> = {
+  LOCKED: "قفل‌شده",
+  COMING_SOON: "به‌زودی (قابل پیش‌رزرو)",
+  ACTIVE: "فعال (ثبت‌نام باز)",
+  DEADLINE_APPROACHING: "مهلت رو به پایان (ثبت‌نام باز)",
+  SUBMITTED: "ثبت‌شده",
+  COMPLETED: "تکمیل‌شده (دسترسی ویدیویی - هزینه کمتر)",
+};
+
+export function UnifiedRegisterModal({ open, onClose, preselectBootcampId }: Props) {
+  const [step, setStep] = useState<Step>("ACCOUNT");
+
+  const [email, setEmail] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [telegramPhone, setTelegramPhone] = useState("");
+
+  const [code, setCode] = useState("");
+  const [password, setPassword] = useState("");
+
+  const [loadingBootcamps, setLoadingBootcamps] = useState(false);
+  const [bootcamps, setBootcamps] = useState<Bootcamp[]>([]);
+  const [selectedBootcampIds, setSelectedBootcampIds] = useState<string[]>([]);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    setStep("ACCOUNT");
+    setEmail("");
+    setFirstName("");
+    setLastName("");
+    setTelegramPhone("");
+    setCode("");
+    setSelectedBootcampIds(preselectBootcampId ? [preselectBootcampId] : []);
+    setSuccessMsg(null);
+    setError(null);
+  }, [open, preselectBootcampId]);
+
+  const canProceedAccount = useMemo(() => {
+    return email.trim().length > 3 && firstName.trim().length > 0 && lastName.trim().length > 0;
+  }, [email, firstName, lastName]);
+
+  async function loadBootcamps() {
+    setLoadingBootcamps(true);
+    try {
+      const { data } = await apiClient.get<Bootcamp[] | { success: boolean; data: Bootcamp[] }>("/bootcamps/public/list");
+      if (Array.isArray(data)) {
+        setBootcamps(data);
+      } else if (data && Array.isArray((data as any).data)) {
+        setBootcamps((data as any).data);
+      } else {
+        setBootcamps([]);
+      }
+    } catch (e) {
+      setError("خطا در دریافت لیست بوت‌کمپ‌ها");
+    } finally {
+      setLoadingBootcamps(false);
+    }
+  }
+
+  async function handleSendCode(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setSubmitting(true);
+    try {
+      await apiClient.post("/auth/register", {
+        email: email.trim(),
+        password: password.trim(),
+      });
+      setStep("VERIFY");
+    } catch (e: any) {
+      const msg = e?.response?.data?.message || "خطا در ارسال کد تایید";
+      if (typeof msg === "string" && msg.includes("قبلاً ثبت‌نام کرده")) {
+        setStep("VERIFY");
+      } else {
+        setError(Array.isArray(msg) ? msg.join("، ") : msg);
+      }
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function handleVerify(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setSubmitting(true);
+    try {
+      const { data } = await apiClient.post<{ success: boolean; token?: string; accessToken?: string }>(
+        "/auth/verify-email",
+        {
+          email: email.trim(),
+          code: code.trim(),
+          firstName: firstName.trim(),
+          lastName: lastName.trim(),
+          telegramPhone: telegramPhone.trim() || undefined,
+          password: password ? password : undefined,
+        }
+      );
+      const token = data?.token || (data as any)?.accessToken;
+      if (token) {
+        localStorage.setItem("token", token);
+        localStorage.setItem("auth_token", token);
+      }
+      setStep("BOOTCAMPS");
+      await loadBootcamps();
+    } catch (e: any) {
+      const msg = e?.response?.data?.message || "کد تایید نامعتبر یا منقضی است.";
+      setError(Array.isArray(msg) ? msg.join("، ") : msg);
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  const selectable = (s: Bootcamp["status"]) =>
+    s === "COMING_SOON" || s === "ACTIVE" || s === "DEADLINE_APPROACHING" || s === "COMPLETED";
+
+  function toggleSelection(id: string) {
+    setSelectedBootcampIds(prev =>
+      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+    );
+  }
+
+  
+  function handleSkipToDashboard() {
+    onClose();
+    window.location.href = "/dashboard";
+  }
+
+  async function handleSubmitBootcamps(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setSubmitting(true);
+    try {
+      if (selectedBootcampIds.length === 0) {
+        setError("حداقل یک بوت‌کمپ را انتخاب کنید.");
+        setSubmitting(false);
+        return;
+      }
+      for (const id of selectedBootcampIds) {
+        const bc = bootcamps.find(b => b.id === id);
+        const note = bc?.status === "COMPLETED" ? "درخواست دسترسی فیلم و محتوا (هزینه کمتر)" : undefined;
+        await createBootcampRegistration({
+          bootcampId: id,
+          fullName: `${firstName} ${lastName}`.trim(),
+          phone: telegramPhone || "ثبت شده در پروفایل",
+          email: email.trim(),
+          telegramId: telegramPhone.trim() || undefined,
+          note,
+        });
+      }
+      setSuccessMsg("ثبت‌نام و درخواست‌های شما با موفقیت ثبت شد!");
+      setTimeout(() => {
+        onClose();
+      window.location.href = "/dashboard";
+        window.location.reload();
+      }, 2000);
+    } catch (e: any) {
+      const msg = e?.response?.data?.message || "خطا در ثبت نهایی بوت‌کمپ‌ها.";
+      setError(Array.isArray(msg) ? msg.join("، ") : msg);
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  if (!open) return null;
+
+  return (
+    <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
+      <div className="fixed inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
+      <div
+        className="relative z-10 w-full max-w-lg rounded-2xl p-6 shadow-2xl overflow-hidden border"
+        style={{
+          backgroundColor: "var(--bg-secondary)",
+          borderColor: "var(--surface)",
+          color: "var(--text)"
+        }}
+      >
+        <div className="flex items-center justify-between pb-4 border-b" style={{ borderColor: "var(--surface)" }}>
+          <h3 className="text-lg font-bold" style={{ color: "var(--accent)" }}>
+            {step === "ACCOUNT" && "ثبت‌نام سریع در جشنواره"}
+            {step === "VERIFY" && "تایید ایمیل و فعال‌سازی"}
+            {step === "BOOTCAMPS" && "انتخاب بوت‌کمپ‌ها / دوره‌ها"}
+          </h3>
+          
+
+
+            <button
+            onClick={onClose}
+            className="w-8 h-8 rounded-full flex items-center justify-center opacity-70 hover:opacity-100 transition"
+            style={{ backgroundColor: "var(--surface)" }}
+          >
+            ✕
+          </button>
+        </div>
+
+        {error && (
+          <div className="mt-4 p-3 rounded-lg text-sm bg-red-500/10 border border-red-500/30 text-red-400">
+            {error}
+          </div>
+        )}
+
+        {successMsg && (
+          <div className="mt-4 p-3 rounded-lg text-sm bg-emerald-500/10 border border-emerald-500/30 text-emerald-400">
+            {successMsg}
+          </div>
+        )}
+
+        {step === "ACCOUNT" && (
+          <form onSubmit={handleSendCode} className="mt-5 flex flex-col gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs mb-1.5 opacity-80">نام *</label>
+                <input
+                  type="text"
+                  required
+                  value={firstName}
+                  onChange={e => setFirstName(e.target.value)}
+                  className="w-full rounded-xl px-3 py-2 text-sm outline-none border focus:border-amber-400"
+                  style={{ backgroundColor: "var(--bg)", borderColor: "var(--surface)", color: "var(--text)" }}
+                  placeholder="مثال: علی"
+                />
+              </div>
+              <div>
+                <label className="block text-xs mb-1.5 opacity-80">نام خانوادگی *</label>
+                <input
+                  type="text"
+                  required
+                  value={lastName}
+                  onChange={e => setLastName(e.target.value)}
+                  className="w-full rounded-xl px-3 py-2 text-sm outline-none border focus:border-amber-400"
+                  style={{ backgroundColor: "var(--bg)", borderColor: "var(--surface)", color: "var(--text)" }}
+                  placeholder="مثال: محمدی"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs mb-1.5 opacity-80">آدرس ایمیل *</label>
+              <input
+                type="email"
+                required
+                dir="ltr"
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                className="w-full rounded-xl px-3 py-2 text-sm outline-none border focus:border-amber-400 text-left"
+                style={{ backgroundColor: "var(--bg)", borderColor: "var(--surface)", color: "var(--text)" }}
+                placeholder="name@example.com"
+              />
+            </div>
+            <div className="mt-3">
+              <label className="block text-xs text-slate-400 mb-1">رمز عبور</label>
+              <input
+                type="password"
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="حداقل ۸ کاراکتر برای ورودهای بعدی"
+                className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-amber-400"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs mb-1.5 opacity-80">شماره یا آیدی تلگرام (اختیاری جهت اطلاع‌رسانی)</label>
+              <input
+                type="text"
+                dir="ltr"
+                value={telegramPhone}
+                onChange={e => setTelegramPhone(e.target.value)}
+                className="w-full rounded-xl px-3 py-2 text-sm outline-none border focus:border-amber-400 text-left"
+                style={{ backgroundColor: "var(--bg)", borderColor: "var(--surface)", color: "var(--text)" }}
+                placeholder="0912... یا username@"
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={!canProceedAccount || submitting}
+              className="mt-2 w-full py-2.5 rounded-full font-bold transition hover:opacity-90 disabled:opacity-50 text-sm"
+              style={{ backgroundColor: "var(--accent)", color: "var(--bg)" }}
+            >
+              {submitting ? "در حال ارسال کد..." : "دریافت کد تایید ایمیل"}
+            </button>
+          </form>
+        )}
+
+        {step === "VERIFY" && (
+          <form onSubmit={handleVerify} className="mt-5 flex flex-col gap-4">
+            <p className="text-xs opacity-80 leading-relaxed">
+              کد تایید ۶ رقمی به ایمیل <strong className="text-amber-400">{email}</strong> ارسال شد. لطفاً آن را وارد کنید:
+            </p>
+            <div>
+              <input
+                type="text"
+                required
+                maxLength={6}
+                value={code}
+                onChange={e => setCode(e.target.value)}
+                className="w-full text-center tracking-[0.5em] text-2xl font-mono py-3 rounded-xl border outline-none focus:border-amber-400"
+                style={{ backgroundColor: "var(--bg)", borderColor: "var(--surface)", color: "var(--text)" }}
+                placeholder="------"
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={submitting || code.trim().length < 4}
+              className="w-full py-2.5 rounded-full font-bold transition hover:opacity-90 disabled:opacity-50 text-sm"
+              style={{ backgroundColor: "var(--accent)", color: "var(--bg)" }}
+            >
+              {submitting ? "در حال اعتبارسنجی..." : "تایید و مرحله بعد"}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setStep("ACCOUNT")}
+              className="text-xs opacity-70 hover:opacity-100 text-center"
+            >
+              ویرایش ایمیل و مشخصات
+            </button>
+          </form>
+        )}
+
+        {step === "BOOTCAMPS" && (
+          <form onSubmit={handleSubmitBootcamps} className="mt-5 flex flex-col gap-4">
+            <p className="text-xs opacity-80">
+              حساب شما با موفقیت ایجاد شد! اکنون می‌توانید دوره‌ها و بوت‌کمپ‌های موردنظر خود را رزرو یا انتخاب فرمایید:
+            </p>
+
+            {loadingBootcamps ? (
+              <div className="py-8 text-center text-sm opacity-60">در حال دریافت لیست دوره‌ها...</div>
+            ) : (
+              <div
+                className="max-h-64 overflow-y-auto rounded-xl border divide-y flex flex-col"
+                style={{ backgroundColor: "var(--bg)", borderColor: "var(--surface)" }}
+              >
+                {bootcamps.length === 0 ? (
+                  <div className="p-4 text-center text-xs opacity-60">در حال حاضر دوره‌ای یافت نشد.</div>
+                ) : (
+                  bootcamps.map(b => {
+                    const isSelectable = selectable(b.status);
+                    const isSelected = selectedBootcampIds.includes(b.id);
+                    return (
+                      <label
+                        key={b.id}
+                        className={`flex items-start gap-3 p-3 transition cursor-pointer select-none ${
+                          !isSelectable ? "opacity-50 cursor-not-allowed" : "hover:bg-white/5"
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          disabled={!isSelectable}
+                          checked={isSelected}
+                          onChange={() => toggleSelection(b.id)}
+                          className="mt-1 accent-amber-400"
+                        />
+                        <div className="flex-1">
+                          <div className="text-sm font-semibold">{b.title}</div>
+                          <div className="text-xs mt-1" style={{ color: "var(--accent)" }}>
+                            {STATUS_LABEL[b.status] || b.status}
+                          </div>
+                        </div>
+                      </label>
+                    );
+                  })
+                )}
+              </div>
+            )}
+
+            <div className="flex gap-2">
+              <button
+                type="submit"
+                disabled={submitting || selectedBootcampIds.length === 0}
+                className="flex-1 py-2.5 rounded-full font-bold transition hover:opacity-90 disabled:opacity-50 text-sm"
+                style={{ backgroundColor: "var(--accent)", color: "var(--bg)" }}
+              >
+                {submitting ? "در حال ثبت درخواست..." : "تکمیل و ثبت نهایی"}
+              </button>
+              <button
+                type="button"
+                onClick={() => { onClose();
+      window.location.href = "/dashboard"; window.location.reload(); }}
+                className="px-5 py-2.5 rounded-full text-sm font-medium border opacity-80 hover:opacity-100"
+                style={{ borderColor: "var(--surface)" }}
+              >
+                رد شدن
+              </button>
+            </div>
+          </form>
+        )}
+      </div>
+    </div>
+  );
+}

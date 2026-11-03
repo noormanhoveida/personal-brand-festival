@@ -19,6 +19,7 @@ interface SectionItem {
 
 interface CMSData {
   sections: SectionItem[];
+  heroVideoUrl?: string | null;
 }
 
 const initialFallback: CMSData = {
@@ -54,6 +55,8 @@ export const AdminLandingPage: React.FC = () => {
   const [toast, setToast] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   // وضعیت ویرایش کارت در مدال
+  const [uploadingVideo, setUploadingVideo] = useState(false);
+  const [selectedVideo, setSelectedVideo] = useState<File | null>(null);
   const [editingCard, setEditingCard] = useState<{ sectionId: string; card: CardItem; isNew: boolean } | null>(null);
 
   useEffect(() => {
@@ -98,6 +101,49 @@ export const AdminLandingPage: React.FC = () => {
   };
 
   // افزودن دسته جدید
+  const handleUploadVideo = async () => {
+    if (!selectedVideo) return;
+    setUploadingVideo(true);
+    try {
+      const token = localStorage.getItem("token") || localStorage.getItem("auth_token");
+      const formData = new FormData();
+      formData.append("video", selectedVideo);
+
+      const res = await axios.post("/api/landing/hero-video", formData, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        }
+      });
+      if (res.data.success) {
+        setData(prev => ({ ...prev, heroVideoUrl: res.data.data.heroVideoUrl }));
+        setSelectedVideo(null);
+        setToast({ type: "success", text: "تیزر ویدیویی با موفقیت آپلود شد." });
+      }
+    } catch (err: any) {
+      setToast({ type: "error", text: err.response?.data?.message || "خطا در آپلود ویدیو" });
+    } finally {
+      setUploadingVideo(false);
+    }
+  };
+
+  const handleDeleteVideo = async () => {
+    if (!window.confirm("آیا از حذف تیزر ویدیویی هیرو اطمینان دارید؟")) return;
+    setUploadingVideo(true);
+    try {
+      const token = localStorage.getItem("token") || localStorage.getItem("auth_token");
+      await axios.delete("/api/landing/hero-video", {
+        headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) }
+      });
+      setData(prev => ({ ...prev, heroVideoUrl: null }));
+      setToast({ type: "success", text: "تیزر ویدیویی با موفقیت حذف شد." });
+    } catch (err: any) {
+      setToast({ type: "error", text: "خطا در حذف ویدیو" });
+    } finally {
+      setUploadingVideo(false);
+    }
+  };
+
   const handleAddSection = () => {
     const newSec: SectionItem = {
       id: "sec-" + Date.now(),
@@ -214,7 +260,65 @@ export const AdminLandingPage: React.FC = () => {
         </div>
       )}
 
-      {/* لیست بخش‌ها */}
+      {/* مدیریت تیزر ویدیویی هیرو */}
+        <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-6 backdrop-blur-xl mb-8">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-800/80 pb-4 mb-5">
+            <div>
+              <h3 className="text-base font-bold text-white flex items-center gap-2">
+                <span>🎬</span> تیزر ویدیویی بخش هیرو (مربع اول صفحه)
+              </h3>
+              <p className="text-xs text-slate-400 mt-1">
+                ویدیوی متحرک برای جایگزینی کارت اثر انگشت (فرمت‌های MP4 و WebM تا ۶۰ مگابایت)
+              </p>
+            </div>
+            {data.heroVideoUrl && (
+              <button
+                type="button"
+                onClick={handleDeleteVideo}
+                disabled={uploadingVideo}
+                className="px-3.5 py-1.5 rounded-lg border border-red-500/40 bg-red-500/10 text-xs font-bold text-red-400 hover:bg-red-500/20 transition-all disabled:opacity-50"
+              >
+                حذف تیزر فعلی
+              </button>
+            )}
+          </div>
+
+          {data.heroVideoUrl ? (
+            <div className="flex flex-col md:flex-row gap-6 items-center">
+              <div className="w-full md:w-64 aspect-video rounded-xl overflow-hidden border border-slate-700 bg-black">
+                <video src={data.heroVideoUrl} controls className="w-full h-full object-cover" />
+              </div>
+              <div className="flex-1 text-xs space-y-2 text-slate-300">
+                <p className="text-emerald-400 font-bold flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                  تیزر در صفحه اصلی فعال است
+                </p>
+                <p className="font-mono text-[11px] text-slate-400 break-all bg-slate-950/60 p-2 rounded border border-slate-800">
+                  {data.heroVideoUrl}
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div className="flex flex-col sm:flex-row items-center gap-4">
+              <input
+                type="file"
+                accept="video/mp4,video/webm,video/ogg,video/quicktime"
+                onChange={e => setSelectedVideo(e.target.files?.[0] || null)}
+                className="text-xs text-slate-300 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-slate-800 file:text-amber-400 hover:file:bg-slate-700 cursor-pointer"
+              />
+              <button
+                type="button"
+                onClick={handleUploadVideo}
+                disabled={!selectedVideo || uploadingVideo}
+                className="px-5 py-2 rounded-lg bg-amber-500 text-slate-950 text-xs font-black hover:bg-amber-400 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-[0_0_20px_rgba(245,158,11,0.2)]"
+              >
+                {uploadingVideo ? "در حال آپلود و ذخیره..." : "آپلود و انتشار تیزر"}
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* لیست بخش‌ها */}
       <div className="space-y-8">
         {data.sections.map((section, secIdx) => (
           <div key={section.id} className="rounded-2xl border border-gray-800 bg-gray-900/50 p-6 shadow-sm">

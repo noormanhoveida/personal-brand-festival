@@ -1,0 +1,171 @@
+import { prisma } from "../../config/db";
+
+export class ChatService {
+  // ۱. جستجوی کاربران
+  static async searchUsers(currentUserId: string, search?: string) {
+    const whereClause: any = {
+      id: { not: currentUserId },
+      isBlocked: false,
+    };
+
+    if (search && search.trim()) {
+      const term = search.trim();
+      whereClause.OR = [
+        { email: { contains: term, mode: "insensitive" } },
+        { phone: { contains: term } },
+        {
+          participantProfile: {
+            OR: [
+              { firstName: { contains: term, mode: "insensitive" } },
+              { lastName: { contains: term, mode: "insensitive" } },
+            ],
+          },
+        },
+      ];
+    }
+
+    const users = await prisma.user.findMany({
+      where: whereClause,
+      take: 25,
+      select: {
+        id: true,
+        email: true,
+        role: true,
+        participantProfile: {
+          select: {
+            firstName: true,
+            lastName: true,
+          },
+        },
+      },
+    });
+
+    return users.map((u: any) => {
+      const fullName = u.participantProfile
+        ? `${u.participantProfile.firstName || ""} ${u.participantProfile.lastName || ""}`.trim()
+        : "";
+      return {
+        id: u.id,
+        name: fullName || u.email || "کاربر سایت",
+        avatarUrl: null,
+        role: u.role,
+      };
+    });
+  }
+
+  // ۲. استخراج لیست گفتگوها بر اساس آخرین پیام‌ها
+  static async getConversations(currentUserId: string) {
+    const messages = await prisma.directMessage.findMany({
+      where: {
+        OR: [{ senderId: currentUserId }, { receiverId: currentUserId }],
+      },
+      orderBy: { createdAt: "desc" },
+      take: 100,
+    });
+
+    // استخراج آی‌دی سایر طرف‌های گفتگو
+    const otherUserIds = Array.from(
+      new Set(
+        messages.map((m: any) => (m.senderId === currentUserId ? m.receiverId : m.senderId))
+      )
+    );
+
+    if (otherUserIds.length === 0) {
+      return [];
+    }
+
+    // واکشی مشخصات کاربران مخاطب
+    const users = await prisma.user.findMany({
+      where: { id: { in: otherUserIds } },
+      select: {
+        id: true,
+        email: true,
+        participantProfile: {
+          select: {
+            firstName: true,
+            lastName: true,
+          },
+        },
+      },
+    });
+
+    const userMap = new Map<string, any>();
+    users.forEach((u: any) => {
+      const fullName = u.participantProfile
+        ? `${u.participantProfile.firstName || ""} ${u.participantProfile.lastName || ""}`.trim()
+        : "";
+      userMap.set(u.id, {
+        userId: u.id,
+        name: fullName || u.email || "کاربر سایت",
+        avatarUrl: null,
+      });
+    });
+
+    const conversationMap = new Map<string, any>();
+
+    for (const msg of messages) {
+      const isSender = msg.senderId === currentUserId;
+      const otherId = isSender ? msg.receiverId : msg.senderId;
+      const otherInfo = userMap.get(otherId) || {
+        userId: otherId,
+        name: "کاربر سایت",
+        avatarUrl: null,
+      };
+
+      if (!conversationMap.has(otherId)) {
+        conversationMap.set(otherId, {
+          ...otherInfo,
+          lastMessage: msg.content,
+          lastMessageAt: msg.createdAt,
+          unreadCount: !isSender && !msg.isRead ? 1 : 0,
+        });
+      } else if (!isSender && !msg.isRead) {
+        const conv = conversationMap.get(otherId);
+        conv.unreadCount += 1;
+      }
+    }
+
+    return Array.from(conversationMap.values());
+  }
+
+  // ۳. پیام‌های بین دو کاربر
+  static async getMessages(currentUserId: string, otherUserId: string) {
+    await prisma.directMessage.updateMany({
+      where: {
+        senderId: otherUserId,
+        receiverId: currentUserId,
+        isRead: false,
+      },
+      data: { isRead: true },
+    });
+
+    return prisma.directMessage.findMany({
+      where: {
+        OR: [
+          { senderId: currentUserId, receiverId: otherUserId },
+          { senderId: otherUserId, receiverId: currentUserId },
+        ],
+      },
+      orderBy: { createdAt: "asc" },
+      take: 100,
+    });
+  }
+
+  // ۴. ارسال پیام
+  static async sendMessage(senderId: string, receiverId: string, content: string) {
+    if (!content || !content.trim()) {
+      throw new Error("متن پیام نمی‌تواند خالی باشد");
+    }
+    if (senderId === receiverId) {
+      throw new Error("امکان ارسال پیام به خودتان وجود ندارد");
+    }
+
+    return prisma.directMessage.create({
+      data: {
+        senderId,
+        receiverId,
+        content: content.trim(),
+      },
+    });
+  }
+}

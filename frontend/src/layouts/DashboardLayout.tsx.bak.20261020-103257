@@ -1,0 +1,242 @@
+import { useState } from "react";
+import { NavLink, Outlet, useLocation, Link } from "react-router-dom";
+import { motion, AnimatePresence } from "framer-motion";
+import { ThemeSwitcher } from "../features/theme/ThemeSwitcher";
+import { useAppSelector } from "../hooks/redux";
+import { PreAssessmentGate } from "../components/PreAssessmentGate";
+
+const PARTICIPANT_NAV = [
+  { to: "/dashboard", label: "داشبورد" },
+  { to: "/dashboard/journey", label: "مسیر برند من" },
+  { to: "/dashboard/bootcamps", label: "بوت‌کمپ‌ها / آکادمی" },
+  { to: "/dashboard/challenges", label: "چالش‌های هفتگی" },
+  { to: "/dashboard/mirror", label: "آینه من" },
+  { to: "/dashboard/artifacts", label: "آثار و دستاوردها" },
+  { to: "/dashboard/transformation", label: "مسیر تحول" },
+  { to: "/dashboard/profile", label: "پروفایل من" },
+  { to: "/dashboard/public-page", label: "صفحه عمومی من" },
+];
+
+const EVALUATOR_NAV = [
+  { to: "/dashboard/evaluator", label: "شرکت‌کنندگان من" },
+  { to: "/dashboard/approval", label: "تأیید پاسخ‌ها" },
+  { to: "/dashboard/leaderboards", label: "تابلوهای امتیاز" },
+];
+
+const MANAGER_NAV = [
+  { to: "/dashboard/manager/bootcamps", label: "مدیریت بوت‌کمپ‌ها / آکادمی" },
+  { to: "/dashboard/manager/challenges", label: "چالش‌های هفتگی" },
+];
+
+const ADMIN_NAV = [
+  { to: "/dashboard/admin", label: "نمای کلی" },
+  { to: "/dashboard/admin/bootcamps", label: "مدیریت بوت‌کمپ‌ها / آکادمی" },
+  { to: "/dashboard/admin/artifacts", label: "مدیریت آثار" },
+  { to: "/dashboard/admin/journey", label: "مدیریت مسیر برند" },
+  { to: "/dashboard/admin/situations", label: "موقعیت‌ها و صفات" },
+  { to: "/dashboard/admin/pre-assessment", label: "پیش‌ارزیابی" },
+  { to: "/dashboard/admin/challenges", label: "چالش‌های هفتگی" },
+  { to: "/dashboard/leaderboards", label: "تابلوهای امتیاز" },
+  { to: "/dashboard/admin/users", label: "کاربران" },
+  { to: "/dashboard/admin/regions", label: "مناطق" },
+  { to: "/dashboard/admin/participants", label: "شرکت‌کنندگان" },
+  { to: "/dashboard/admin/assignments", label: "تخصیص ارزیاب" },
+  { to: "/dashboard/admin/criteria", label: "معیارهای ارزیابی" },
+  { to: "/dashboard/admin/analytics", label: "آنالیتیکس" },
+  { to: "/dashboard/admin/forms", label: "فرم‌ساز و نظرسنجی" },
+  { to: "/dashboard/admin/showcase", label: "ویترین فستیوال" },
+  { to: "/dashboard/admin/landing", label: "مدیریت صفحه اصلی" },
+];
+
+function NavSection({
+  title,
+  items,
+  onNavigate,
+}: {
+  title?: string;
+  items: { to: string; label: string }[];
+  onNavigate?: () => void;
+}) {
+  return (
+    <div className="mb-4">
+      {title && (
+        <div className="mb-1 px-3 text-xs font-semibold uppercase tracking-wider opacity-50">
+          {title}
+        </div>
+      )}
+      <div className="space-y-0.5">
+        {items.map((it) => (
+          <NavLink
+            key={it.to}
+            to={it.to}
+            end={it.to === "/dashboard"}
+            onClick={onNavigate}
+            className={({ isActive }) =>
+              `flex items-center rounded-xl px-3 py-2 text-sm font-medium transition ${
+                isActive
+                  ? "bg-amber-500/15 text-amber-500 font-bold"
+                  : "opacity-75 hover:opacity-100 hover:bg-white/5"
+              }`
+            }
+          >
+            {it.label}
+          </NavLink>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function NavContent({ role, onNavigate }: { role?: any; onNavigate?: () => void }) {
+  return (
+    <>
+      <div className="mb-4 px-3 text-base font-extrabold tracking-tight" style={{ color: "var(--accent)" }}>
+        فستیوال برند شخصی
+      </div>
+
+      <NavSection items={PARTICIPANT_NAV} onNavigate={onNavigate} />
+
+      {role === "EVALUATOR" && (
+        <NavSection title="پنل ارزیاب" items={EVALUATOR_NAV} onNavigate={onNavigate} />
+      )}
+      {(role === "BOOTCAMP_MANAGER" || role === "ADMIN") && (
+        <NavSection title="مدیریت بوت‌کمپ‌ها / آکادمی" items={MANAGER_NAV} onNavigate={onNavigate} />
+      )}
+      {role === "ADMIN" && <NavSection title="مدیریت" items={ADMIN_NAV} onNavigate={onNavigate} />}
+      <div className="mt-auto">
+        <NavSection items={[{ to: "/dashboard/settings", label: "تنظیمات" }]} onNavigate={onNavigate} />
+      </div>
+    </>
+  );
+}
+
+export function DashboardLayout() {
+  const role = useAppSelector((s) => s.auth.role);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const location = useLocation();
+
+  const isDashboardHome = location.pathname === "/dashboard" || location.pathname === "/dashboard/";
+
+  return (
+    <div className="flex min-h-screen relative">
+      <PreAssessmentGate />
+      {/* Desktop sidebar */}
+      <aside
+        className="hidden w-64 shrink-0 flex-col gap-1 border-l px-4 py-6 md:flex"
+        style={{ backgroundColor: "var(--bg-secondary)", borderColor: "var(--surface)" }}
+      >
+        <NavContent role={role} />
+      </aside>
+
+      {/* Mobile drawer */}
+      <AnimatePresence>
+        {drawerOpen && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setDrawerOpen(false)}
+              className="fixed inset-0 z-[90] bg-black/50 md:hidden"
+            />
+            <motion.aside
+              initial={{ x: "100%" }}
+              animate={{ x: 0 }}
+              exit={{ x: "100%" }}
+              transition={{ type: "tween", duration: 0.25 }}
+              className="fixed inset-y-0 right-0 z-[100] flex w-[85vw] max-w-[320px] shadow-2xl flex-col gap-1 overflow-y-auto px-4 py-6 md:hidden"
+              style={{ backgroundColor: "var(--bg-secondary)" }}
+            >
+              <button
+                onClick={() => setDrawerOpen(false)}
+                className="mb-4 self-start text-sm opacity-70"
+              >
+                ✕ بستن
+              </button>
+              <NavContent role={role} onNavigate={() => setDrawerOpen(false)} />
+            </motion.aside>
+          </>
+        )}
+      </AnimatePresence>
+
+      <div className="flex flex-1 flex-col">
+        <header
+          className="flex items-center justify-between border-b px-6 py-3"
+          style={{ borderColor: "var(--surface)" }}
+        >
+          <button
+            onClick={() => setDrawerOpen(true)}
+            className="text-sm opacity-70 md:hidden"
+            aria-label="باز کردن منو"
+          >
+            ☰ منو
+          </button>
+          <nav
+            aria-label="پیوندهای عمومی"
+            className="hidden min-w-0 flex-1 md:flex items-center justify-center gap-3 overflow-x-auto px-2 text-xs md:gap-6 md:text-sm"
+          >
+            <Link to="/" className="whitespace-nowrap opacity-80 transition hover:opacity-100">
+              صفحه اصلی
+            </Link>
+            <Link to="/community" className="whitespace-nowrap opacity-80 transition hover:opacity-100">
+              شرکت‌کنندگان
+            </Link>
+            <Link to="/showcase" className="whitespace-nowrap opacity-80 transition hover:opacity-100">
+              برترین‌های جشنواره
+            </Link>
+            <Link to="/dashboard/bootcamps" className="whitespace-nowrap opacity-80 transition hover:opacity-100">
+              بوت‌کمپ‌ها / آکادمی
+            </Link>
+          </nav>
+          <ThemeSwitcher />
+        </header>
+        <main className="flex-1 p-6">
+          <Outlet />
+        </main>
+      </div>
+
+      {/* دکمه شناور بازگشت به داشبورد اصلی */}
+      <AnimatePresence>
+        {!isDashboardHome && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.8, y: 20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.8, y: 20 }}
+            transition={{ type: "spring", stiffness: 350, damping: 25 }}
+            className="fixed bottom-6 left-6 z-40"
+          >
+            <Link
+              to="/dashboard"
+              title="بازگشت به داشبورد اصلی"
+              className="group flex items-center gap-2.5 rounded-full px-4 py-3 shadow-2xl backdrop-blur-md transition-all duration-300 hover:scale-105 active:scale-95 border"
+              style={{
+                backgroundColor: "rgba(24, 24, 27, 0.88)",
+                borderColor: "rgba(245, 158, 11, 0.4)",
+                boxShadow: "0 10px 25px -5px rgba(245, 158, 11, 0.25), 0 8px 10px -6px rgba(0, 0, 0, 0.5)",
+              }}
+            >
+              <div className="flex h-7 w-7 items-center justify-center rounded-full bg-amber-500/20 text-amber-400 group-hover:bg-amber-500 group-hover:text-zinc-950 transition-colors">
+                <svg
+                  className="h-4 w-4"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth="2.2"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"
+                  />
+                </svg>
+              </div>
+              <span className="text-xs font-bold text-zinc-100 group-hover:text-amber-400 transition-colors">
+                داشبورد اصلی
+              </span>
+            </Link>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}

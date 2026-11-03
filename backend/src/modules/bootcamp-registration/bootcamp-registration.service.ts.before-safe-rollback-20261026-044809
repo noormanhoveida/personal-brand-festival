@@ -1,0 +1,159 @@
+import { prisma } from "../../config/db";
+import { BootcampRegistrationStatus } from "@prisma/client";
+
+export interface CreateRegistrationInput {
+  bootcampId: string;
+  fullName: string;
+  mobile?: string;
+  phone?: string;
+  email?: string;
+  telegramId?: string;       // آیدی تلگرام (username)
+  telegramPhone?: string;    // شماره تلگرام
+  notes?: string;            // توضیحات کاربر
+  cardLastDigits?: string;   // ۴ رقم آخر کارت / شماره پیگیری واریز
+}
+
+export async function findRegistration(params: { bootcampId: string; mobile?: string; email?: string }) {
+  const where: any = { bootcampId: params.bootcampId };
+  if (params.mobile) {
+    where.mobile = params.mobile;
+  } else if (params.email) {
+    where.email = params.email;
+  } else {
+    return null;
+  }
+
+  return prisma.bootcampRegistration.findFirst({
+    where,
+    include: {
+      bootcamp: {
+        select: { id: true, title: true }
+      }
+    }
+  });
+}
+
+export async function registerForBootcamp(data: CreateRegistrationInput) {
+  const mobileValue = data.mobile || data.phone;
+  if (!mobileValue) {
+    throw new Error("شماره همراه (mobile) الزامی است.");
+  }
+
+  // بررسی ثبت‌نام قبلی در همین بوت‌کمپ (find or create)
+  const existing = await findRegistration({
+    bootcampId: data.bootcampId,
+    mobile: mobileValue,
+    email: data.email || undefined
+  });
+
+  if (existing) {
+    const updated = await prisma.bootcampRegistration.update({
+      where: { id: existing.id },
+      data: {
+        fullName: data.fullName || existing.fullName,
+        mobile: mobileValue,
+        email: data.email || existing.email,
+        telegramId: data.telegramId || existing.telegramId,
+        telegramPhone: data.telegramPhone || existing.telegramPhone,
+        notes: data.notes ?? existing.notes,
+        cardLastDigits: data.cardLastDigits ?? existing.cardLastDigits,
+        status: data.cardLastDigits ? BootcampRegistrationStatus.PAID : existing.status,
+        paidAt: data.cardLastDigits ? new Date() : existing.paidAt
+      },
+      include: {
+        bootcamp: {
+          select: { id: true, title: true }
+        }
+      }
+    });
+    return updated;
+  }
+
+  const registration = await prisma.bootcampRegistration.create({
+    data: {
+      bootcampId: data.bootcampId,
+      fullName: data.fullName,
+      mobile: mobileValue,
+      email: data.email || null,
+      telegramId: data.telegramId || null,
+      telegramPhone: data.telegramPhone || null,
+      notes: data.notes || null,
+      cardLastDigits: data.cardLastDigits || null,
+      status: data.cardLastDigits ? BootcampRegistrationStatus.PAID : BootcampRegistrationStatus.INITIAL,
+      paidAt: data.cardLastDigits ? new Date() : null
+    },
+    include: {
+      bootcamp: {
+        select: { id: true, title: true }
+      }
+    }
+  });
+
+  return registration;
+}
+
+export async function completePayment(params: { trackingCode: string; last4Digits: string; notes?: string }) {
+  const reg = await prisma.bootcampRegistration.update({
+    where: { trackingCode: params.trackingCode },
+    data: {
+      cardLastDigits: params.last4Digits,
+      notes: params.notes || undefined,
+      status: BootcampRegistrationStatus.PAID,
+      paidAt: new Date()
+    },
+    include: {
+      bootcamp: {
+        select: { id: true, title: true }
+      }
+    }
+  });
+
+  return reg;
+}
+
+export async function getRegistrationByCode(trackingCode: string) {
+  return prisma.bootcampRegistration.findUnique({
+    where: { trackingCode },
+    include: {
+      bootcamp: {
+        select: { id: true, title: true }
+      }
+    }
+  });
+}
+
+export async function listRegistrations(filter: { bootcampId?: string; status?: BootcampRegistrationStatus; email?: string }) {
+  const where: any = {};
+  if (filter.bootcampId && filter.bootcampId !== "ALL") where.bootcampId = filter.bootcampId;
+  if (filter.status) where.status = filter.status;
+  if (filter.email) where.email = filter.email;
+  const where: any = {};
+  if (filter.bootcampId && filter.bootcampId !== "ALL") where.bootcampId = filter.bootcampId;
+  if (filter.status) where.status = filter.status;
+
+  return prisma.bootcampRegistration.findMany({
+    where,
+    include: {
+      bootcamp: { select: { id: true, title: true } }
+    },
+    orderBy: { createdAt: "desc" }
+  });
+}
+
+export async function updateRegistrationStatus(
+  id: string,
+  update: { status?: BootcampRegistrationStatus; notes?: string; finalMessage?: string; cardLastDigits?: string }
+) {
+  const data: any = { ...update };
+
+  if (update.status === BootcampRegistrationStatus.PAID) data.paidAt = new Date();
+  if (update.status === BootcampRegistrationStatus.FINALIZED) data.finalizedAt = new Date();
+
+  return prisma.bootcampRegistration.update({
+    where: { id },
+    data,
+    include: {
+      bootcamp: { select: { id: true, title: true } }
+    }
+  });
+}

@@ -1,4 +1,6 @@
-import { AdminSiteHubPage, AdminEvaluationHubPage, AdminAcademyHubPage, AdminScienceHubPage } from "./pages/admin/AdminHubPages";
+import { AdminBusinessShowcasePage } from "./pages/admin/AdminBusinessShowcasePage";
+import { MyBusinessVideoPage } from "./pages/MyBusinessVideoPage";
+import { AdminSiteHubPage, AdminEvaluationHubPage, AdminAcademyHubPage, AdminScienceHubPage, AdminEconomyHubPage } from "./pages/admin/AdminHubPages";
 import { AdminGuidesPage } from "./pages/admin/AdminGuidesPage";
 import { AnnouncementsPage } from "./pages/AnnouncementsPage";
 import { TicketsPage } from "./pages/TicketsPage";
@@ -105,6 +107,7 @@ export function App() {
             <Route path="settings" element={<SettingsPage />} />
                       <Route path="tickets" element={<TicketsPage />} />
             <Route path="announcements" element={<AnnouncementsPage />} />
+            <Route path="business-showcase" element={<MyBusinessVideoPage />} />
 </Route>
         </Route>
 
@@ -143,6 +146,8 @@ export function App() {
             <Route path="hub-eval" element={<AdminEvaluationHubPage />} />
             <Route path="hub-academy" element={<AdminAcademyHubPage />} />
             <Route path="hub-science" element={<AdminScienceHubPage />} />
+            <Route path="hub-economy" element={<AdminEconomyHubPage />} />
+            <Route path="business-showcase" element={<AdminBusinessShowcasePage />} />
             <Route path="guides" element={<AdminGuidesPage />} />
             <Route path="bootcamps" element={<AdminBootcampsPage />} />
             <Route path="artifacts" element={<AdminArtifactsPage />} />

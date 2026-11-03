@@ -7,6 +7,7 @@ import { ResponseWithVersions, listMyResponses } from "../api/responses";
 import { getActiveSessionForBootcamp, LiveSession } from "../api/liveSession";
 import { QuestionBlock } from "../components/QuestionBlock";
 import { Button, Card, LoadError, Spinner, Textarea } from "../components/ui";
+import { listMyBootcampRegistrations } from "../api/bootcampRegistrations";
 
 function TaskCard({ task }: { task: Task }) {
   const [submissions, setSubmissions] = useState<TaskSubmission[] | null>(null);
@@ -33,8 +34,8 @@ function TaskCard({ task }: { task: Task }) {
     <Card>
       <p className="font-medium">{task.title}</p>
       {task.description && (
-      <FormattedContent content={task.description} className="mt-1 text-sm opacity-70" />
-    )}
+        <FormattedContent content={task.description} className="mt-1 text-sm opacity-70" />
+      )}
 
       {submissions && submissions.length > 0 && (
         <div className="mt-3 space-y-2 border-t pt-3" style={{ borderColor: "var(--surface)" }}>
@@ -66,10 +67,77 @@ const STATUS_LABEL: Record<string, string> = {
   COMPLETED: "تکمیل‌شده",
 };
 
+const REGISTRATION_STATUS_LABEL: Record<string, string> = {
+  INITIAL: "ثبت اولیه (در انتظار بررسی/پرداخت)",
+  PAID: "پرداخت شده",
+  FINALIZED: "نهایی شده",
+  DONE: "تکمیل شده",
+};
+
 function relevantStageFor(status: string): "BEFORE" | "AFTER" | null {
   if (status === "LOCKED" || status === "COMING_SOON") return "BEFORE";
   if (status === "SUBMITTED" || status === "COMPLETED") return "AFTER";
   return null;
+}
+
+function renderSmartPlayer(url: string) {
+  if (!url) return null;
+
+  const ytMatch = url.match(/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/);
+  if (ytMatch && ytMatch[1]) {
+    const embedUrl = `https://www.youtube.com/embed/${ytMatch[1]}`;
+    return (
+      <div className="relative aspect-video w-full overflow-hidden rounded-xl bg-black shadow-lg">
+        <iframe
+          src={embedUrl}
+          title="YouTube video player"
+          className="absolute inset-0 h-full w-full border-0"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+          allowFullScreen
+        />
+      </div>
+    );
+  }
+
+  if (url.includes("drive.google.com")) {
+    const driveMatch = url.match(/\/d\/([a-zA-Z0-9_-]+)/);
+    const driveId = driveMatch ? driveMatch[1] : null;
+    const embedUrl = driveId ? `https://drive.google.com/file/d/${driveId}/preview` : url;
+    return (
+      <div className="relative aspect-video w-full overflow-hidden rounded-xl bg-black shadow-lg">
+        <iframe
+          src={embedUrl}
+          title="Google Drive video player"
+          className="absolute inset-0 h-full w-full border-0"
+          allow="autoplay"
+          allowFullScreen
+        />
+      </div>
+    );
+  }
+
+  if (url.match(/\.(mp4|webm|mov)(\?.*)?$/i) || url.startsWith("http")) {
+    return (
+      <video
+        src={url}
+        controls
+        className="w-full rounded-xl shadow-lg max-h-[500px] object-cover bg-black"
+        playsInline
+      />
+    );
+  }
+
+  return (
+    <a
+      href={url}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl font-medium text-sm transition-transform active:scale-95 shadow-md"
+      style={{ backgroundColor: "var(--accent)", color: "var(--bg)" }}
+    >
+      مشاهده یا دانلود فایل ضبط‌شده
+    </a>
+  );
 }
 
 export function BootcampDetailPage() {
@@ -81,21 +149,34 @@ export function BootcampDetailPage() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
 
+  // وضعیت ثبت‌نام کاربر
+  const [myRegistration, setMyRegistration] = useState<any | null>(null);
+
   const reload = () => {
     if (!bootcampId) return;
     setLoading(true);
     setLoadError(null);
-    Promise.all([getBootcamp(bootcampId), listBootcampTasks(bootcampId), listMyResponses()])
-      .then(([bootcampData, tasksData, responsesData]) => {
+    Promise.all([
+      getBootcamp(bootcampId),
+      listBootcampTasks(bootcampId),
+      listMyResponses(),
+      listMyBootcampRegistrations().catch(() => ({ success: false, data: [] })),
+    ])
+      .then(([bootcampData, tasksData, responsesData, regsData]) => {
         setBootcamp(bootcampData);
         setTasks(tasksData);
         setResponses(responsesData);
+        if (regsData && regsData.success && Array.isArray(regsData.data)) {
+          const found = regsData.data.find((r: any) => r.bootcampId === bootcampId);
+          setMyRegistration(found || null);
+        }
         setLoading(false);
       })
       .catch(() => {
         setLoadError("بارگذاری اطلاعات بوت‌کمپ با خطا مواجه شد.");
         setLoading(false);
       });
+
     getActiveSessionForBootcamp(bootcampId)
       .then(setLiveSession)
       .catch(() => setLiveSession(null));
@@ -134,15 +215,17 @@ export function BootcampDetailPage() {
       {visibleForms.map((f) => (
         <div
           key={f.id}
-          className="rounded-xl border-2 border-amber-400 bg-amber-50 p-5 shadow-sm"
+          className="rounded-xl border p-5 shadow-sm"
+          style={{ backgroundColor: "var(--surface)", borderColor: "var(--accent)" }}
         >
-          <h3 className="mb-1 text-lg font-bold text-amber-900">📝 {f.title}</h3>
+          <h3 className="mb-1 text-lg font-bold" style={{ color: "var(--accent)" }}>📝 {f.title}</h3>
           {f.description && (
-            <FormattedContent content={f.description} className="mb-3 text-sm text-amber-800" />
+            <FormattedContent content={f.description} className="mb-3 text-sm opacity-80" />
           )}
           <a
             href={`/forms/${f.slug}`}
-            className="inline-block rounded-lg bg-amber-600 px-5 py-2 text-sm font-semibold text-white transition hover:bg-amber-700"
+            className="inline-block rounded-lg px-5 py-2 text-sm font-semibold transition"
+            style={{ backgroundColor: "var(--accent)", color: "var(--bg)" }}
           >
             تکمیل فرم
           </a>
@@ -152,10 +235,10 @@ export function BootcampDetailPage() {
   );
 
   return (
-    <div className="mx-auto max-w-2xl">
-{renderBootcampForms}
-      <Link to="/dashboard/bootcamps" className="text-sm opacity-70">
-        ← بازگشت به بوت‌کمپ‌ها / بوت‌کمپ‌ها / آکادمی
+    <div className="mx-auto max-w-2xl pb-16">
+      {renderBootcampForms}
+      <Link to="/dashboard/bootcamps" className="text-sm opacity-70 hover:opacity-100 transition">
+        ← بازگشت به بوت‌کمپ‌ها / آکادمی
       </Link>
 
       <div className="mt-2 flex items-center justify-between">
@@ -181,35 +264,42 @@ export function BootcampDetailPage() {
         </Link>
       )}
 
-      {/* Recording Download Section for Completed Bootcamps */}
+      {/* وضعیت ثبت‌نام کاربر (فقط در صورتی که ثبت‌نام شده باشد) */}
+      {myRegistration && (
+        <div className="mt-6 rounded-xl border p-4" style={{ backgroundColor: "var(--surface)", borderColor: "var(--accent)" }}>
+          <div className="flex items-center justify-between">
+            <span className="font-semibold text-sm">وضعیت ثبت‌نام شما در این دوره:</span>
+            <span className="text-xs px-2.5 py-1 rounded-md font-bold" style={{ backgroundColor: "var(--bg)", color: "var(--accent)" }}>
+              {REGISTRATION_STATUS_LABEL[myRegistration.status] || myRegistration.status}
+            </span>
+          </div>
+          <p className="mt-2 text-xs opacity-75">
+            نام ثبت‌شده: <span className="font-medium">{myRegistration.fullName}</span> ({myRegistration.phone})
+          </p>
+        </div>
+      )}
+
+      {/* ویدیوی جلسه برای دوره‌های پایان‌یافته */}
       {bootcamp.status === "COMPLETED" && (
         <div className="mt-6">
           {bootcamp.recordingUrl ? (
             <Card className="border border-opacity-30 border-[var(--accent)]">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div>
-                  <h3 className="font-bold text-base flex items-center gap-2">
-                    <span>🎬</span> ویدیو و فایل ضبط‌شده جلسه
-                  </h3>
-                  <p className="text-xs opacity-70 mt-1">
-                    دسترسی دانلود فایل کامل این بوت‌کمپ در سرور ابری مگا برای شما فعال شده است.
-                  </p>
-                </div>
+              <div className="mb-3 flex items-center justify-between">
+                <h3 className="font-bold text-base flex items-center gap-2">
+                  <span>🎬</span> ویدیوی ضبط‌شده جلسه
+                </h3>
                 <a
                   href={bootcamp.recordingUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl font-medium text-sm transition-transform active:scale-95 shadow-md"
-                  style={{
-                    backgroundColor: "var(--accent)",
-                    color: "var(--bg)",
-                  }}
+                  className="text-xs underline opacity-70 hover:opacity-100"
+                  style={{ color: "var(--accent)" }}
                 >
-                  <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24">
-                    <path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM17 13l-5 5-5-5h3V9h4v4h3z" />
-                  </svg>
-                  دانلود از مگا (Mega.nz)
+                  بازکردن لینک در تب جدید ↗
                 </a>
+              </div>
+              <div className="mt-2">
+                {renderSmartPlayer(bootcamp.recordingUrl)}
               </div>
             </Card>
           ) : (

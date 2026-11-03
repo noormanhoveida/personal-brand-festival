@@ -133,8 +133,17 @@ export async function loginUser(identifier: string, password: string) {
 
   return issueSession(user.id, user.role);
 }
+export async function verifyEmail(
+  email: string,
+  code: string,
+  profileData?: { firstName?: string; lastName?: string; telegramPhone?: string; password?: string }
+) {
+  // Hash password if provided during email verification
+  let _hashedPassword: string | undefined = undefined;
+  if (profileData?.password && profileData.password.trim().length >= 6) {
+    _hashedPassword = await bcrypt.hash(profileData.password.trim(), 10);
+  }
 
-export async function verifyEmail(email: string, code: string) {
   const user = await prisma.user.findUnique({
     where: { email },
     include: { emailVerification: true },
@@ -151,9 +160,48 @@ export async function verifyEmail(email: string, code: string) {
     throw new AuthError("کد وارد‌شده نادرست است.", 400);
   }
   await prisma.$transaction([
-    prisma.user.update({ where: { id: user.id }, data: { emailVerified: true } }),
+    prisma.user.update({ where: { id: user.id }, data: { emailVerified: true,
+        ...(_hashedPassword ? { passwordHash: _hashedPassword } : {}) } }),
     prisma.emailVerificationCode.delete({ where: { userId: user.id } }),
   ]);
+
+  if (profileData && (profileData.firstName || profileData.lastName || profileData.telegramPhone)) {
+    const existingProfile = await prisma.participantProfile.findUnique({
+      where: { userId: user.id },
+    });
+    const firstName = profileData.firstName || existingProfile?.firstName || "";
+    const lastName = profileData.lastName || existingProfile?.lastName || "";
+    const mobile = profileData.telegramPhone || existingProfile?.mobile || "";
+    if (existingProfile) {
+      await prisma.participantProfile.update({
+        where: { userId: user.id },
+        data: {
+          ...(profileData.firstName ? { firstName: profileData.firstName } : {}),
+          ...(profileData.lastName ? { lastName: profileData.lastName } : {}),
+          ...(profileData.telegramPhone ? { mobile: profileData.telegramPhone } : {}),
+        },
+      });
+    } else {
+      const base = ((firstName + "-" + lastName).trim() || "user").replace(/\s+/g, "-");
+      let slug = base;
+      while (await prisma.participantProfile.findUnique({ where: { slug } })) {
+        slug = `${base}-${Math.random().toString(36).substring(2, 7)}`;
+      }
+      await prisma.participantProfile.create({
+        data: {
+          userId: user.id,
+          firstName: firstName || "کاربر",
+          lastName: lastName || "جدید",
+          mobile,
+          province: "",
+          city: "",
+          interests: [],
+          slug,
+        },
+      });
+    }
+  }
+
   return issueSession(user.id, user.role);
 }
 

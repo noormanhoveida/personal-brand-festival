@@ -8,7 +8,7 @@ export class ProfileError extends AppError {}
 export async function getOwnProfile(userId: string) {
   const profile = await prisma.participantProfile.findUnique({
     where: { userId },
-    include: { media: true, region: true },
+    include: { media: true, region: true, user: { select: { email: true } } },
   });
   return profile; // null is a valid state: onboarding not completed yet
 }

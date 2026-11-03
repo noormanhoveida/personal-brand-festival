@@ -22,6 +22,7 @@ import { JourneySection, listJourneySections } from "../../api/journey";
 import { Situation, listSituations } from "../../api/situations";
 import { OptionsEditor } from "../../components/OptionsEditor";
 import { QuestionBankPicker } from "../../components/QuestionBankPicker";
+import { listBootcampRegistrations, updateBootcampRegistrationStatus, BootcampRegistrationItem, BootcampRegistrationStatus } from "../../api/bootcampRegistrations";
 import { Button, Card, ErrorText, Input, Label, LoadError, Spinner, Textarea } from "../../components/ui";
 
 const STATUS_OPTIONS: Bootcamp["status"][] = [
@@ -280,6 +281,36 @@ function TaskAdder({ bootcampId, onAdded }: { bootcampId: string; onAdded: () =>
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [saving, setSaving] = useState(false);
+  const [regModalBootcampId, setRegModalBootcampId] = useState<string | null>(null);
+  const [registrations, setRegistrations] = useState<BootcampRegistrationItem[]>([]);
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
+  const [loadingRegs, setLoadingRegs] = useState(false);
+
+  const openRegistrationsModal = async (bootcampId: string) => {
+    setRegModalBootcampId(bootcampId);
+    setLoadingRegs(true);
+    try {
+      const res = await listBootcampRegistrations({ bootcampId });
+      setRegistrations(res.data || []);
+    } catch (e) {
+      console.error(e);
+      alert("خطا در بارگذاری ثبت‌نام‌کنندگان");
+    } finally {
+      setLoadingRegs(false);
+    }
+  };
+
+  const handleChangeRegStatus = async (regId: string, newStatus: BootcampRegistrationStatus) => {
+    try {
+      await updateBootcampRegistrationStatus(regId, newStatus);
+      setRegistrations((prev) =>
+        prev.map((r) => (r.id === regId ? { ...r, status: newStatus } : r))
+      );
+    } catch {
+      alert("خطا در تغییر وضعیت");
+    }
+  };
+
   const [added, setAdded] = useState(false);
 
   const submit = async () => {
@@ -335,6 +366,36 @@ function QuestionAdder({
   const [situationId, setSituationId] = useState("");
   const [options, setOptions] = useState<string[]>(["", ""]);
   const [saving, setSaving] = useState(false);
+  const [regModalBootcampId, setRegModalBootcampId] = useState<string | null>(null);
+  const [registrations, setRegistrations] = useState<BootcampRegistrationItem[]>([]);
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
+  const [loadingRegs, setLoadingRegs] = useState(false);
+
+  const openRegistrationsModal = async (bootcampId: string) => {
+    setRegModalBootcampId(bootcampId);
+    setLoadingRegs(true);
+    try {
+      const res = await listBootcampRegistrations({ bootcampId });
+      setRegistrations(res.data || []);
+    } catch (e) {
+      console.error(e);
+      alert("خطا در بارگذاری ثبت‌نام‌کنندگان");
+    } finally {
+      setLoadingRegs(false);
+    }
+  };
+
+  const handleChangeRegStatus = async (regId: string, newStatus: BootcampRegistrationStatus) => {
+    try {
+      await updateBootcampRegistrationStatus(regId, newStatus);
+      setRegistrations((prev) =>
+        prev.map((r) => (r.id === regId ? { ...r, status: newStatus } : r))
+      );
+    } catch {
+      alert("خطا در تغییر وضعیت");
+    }
+  };
+
   const [added, setAdded] = useState(false);
 
   const isChoice = inputType === "SINGLE_CHOICE" || inputType === "MULTI_CHOICE";
@@ -560,6 +621,7 @@ function AccessManagementPanel({ bootcampId }: { bootcampId: string }) {
 }
 
 export function AdminBootcampsPage() {
+  const [previewReceiptModal, setPreviewReceiptModal] = useState<string | null>(null);
   const [bootcamps, setBootcamps] = useState<Bootcamp[] | null>(null);
   const [sections, setSections] = useState<JourneySection[]>([]);
   const [situations, setSituations] = useState<Situation[]>([]);
@@ -569,6 +631,36 @@ export function AdminBootcampsPage() {
   const [accessBootcampId, setAccessBootcampId] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
   const [saving, setSaving] = useState(false);
+  const [regModalBootcampId, setRegModalBootcampId] = useState<string | null>(null);
+  const [registrations, setRegistrations] = useState<BootcampRegistrationItem[]>([]);
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
+  const [loadingRegs, setLoadingRegs] = useState(false);
+
+  const openRegistrationsModal = async (bootcampId: string) => {
+    setRegModalBootcampId(bootcampId);
+    setLoadingRegs(true);
+    try {
+      const res = await listBootcampRegistrations({ bootcampId });
+      setRegistrations(res.data || []);
+    } catch (e) {
+      console.error(e);
+      alert("خطا در بارگذاری ثبت‌نام‌کنندگان");
+    } finally {
+      setLoadingRegs(false);
+    }
+  };
+
+  const handleChangeRegStatus = async (regId: string, newStatus: BootcampRegistrationStatus) => {
+    try {
+      await updateBootcampRegistrationStatus(regId, newStatus);
+      setRegistrations((prev) =>
+        prev.map((r) => (r.id === regId ? { ...r, status: newStatus } : r))
+      );
+    } catch {
+      alert("خطا در تغییر وضعیت");
+    }
+  };
+
   const [error, setError] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -695,6 +787,9 @@ export function AdminBootcampsPage() {
                         </option>
                       ))}
                     </select>
+                    <Button variant="ghost" onClick={() => openRegistrationsModal(b.id)} className="text-emerald-400 hover:text-emerald-300">
+                      ثبت‌نام‌کنندگان
+                    </Button>
                     <Button variant="ghost" onClick={() => setEditingId(b.id)}>
                       ویرایش
                     </Button>
@@ -740,6 +835,150 @@ export function AdminBootcampsPage() {
           <p className="text-sm opacity-60">هنوز بوت‌کمپی ساخته نشده — یکی بسازید.</p>
         )}
       </div>
+    
+      {/* Modal مدیریت ثبت‌نام‌کنندگان بوت‌کمپ */}
+      {regModalBootcampId && (
+  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 overflow-y-auto print:bg-white print:p-0">
+    <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-5xl p-6 shadow-2xl space-y-4 max-h-[90vh] flex flex-col print:bg-white print:text-black print:border-none print:shadow-none">
+      <div className="flex justify-between items-center border-b border-slate-800 pb-3 print:border-black">
+        <h3 className="text-lg font-bold text-white print:text-black">مدیریت ثبت‌نام‌کنندگان بوت‌کمپ</h3>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="secondary"
+            onClick={() => {
+              window.print();
+            }}
+            className="print:hidden bg-emerald-600 text-white hover:bg-emerald-700 text-xs px-3 py-1.5"
+          >
+            🖨️ خروجی PDF
+          </Button>
+
+          <button
+            onClick={() => setRegModalBootcampId(null)}
+            className="text-slate-400 hover:text-white text-xl font-bold px-2 print:hidden"
+            aria-label="close"
+          >
+            ✕
+          </button>
+        </div>
+      </div>
+
+      <div className="flex-1 overflow-y-auto">
+        <div id="printable-registrations-table" className="print:overflow-visible">
+<div className="hidden print:block mb-4" style={{ direction: "rtl" }}>
+  <h2 className="text-xl font-bold mb-1">لیست ثبت‌نام‌کنندگان بوت‌کمپ</h2>
+  {(() => {
+    const b = bootcamps.find((x) => x.id === regModalBootcampId);
+    if (!b) return null;
+    return (
+      <div className="text-sm space-y-1">
+        <div><span className="font-semibold">عنوان بوت‌کمپ:</span> {b.title}</div>
+        <div>
+          <span className="font-semibold">تاریخ برگزاری:</span>{" "}
+          {b.startTime ? new Date(b.startTime).toLocaleDateString("fa-IR") : "—"}
+          {b.endTime ? ` تا ${new Date(b.endTime).toLocaleDateString("fa-IR")}` : ""}
+        </div>
+      </div>
+    );
+  })()}
+  <hr className="my-2 border-black" />
+</div>
+
+          {loadingRegs ? (
+            <div className="flex justify-center p-8"><Spinner /></div>
+          ) : registrations.length === 0 ? (
+            <div className="text-center text-slate-400 py-10">هنوز هیچ ثبت‌نامی برای این بوت‌کمپ انجام نشده است.</div>
+          ) : (
+            <table className="w-full text-sm text-right text-slate-300 border-collapse print:text-black">
+              <thead className="text-xs uppercase bg-slate-800 text-slate-400 border-b border-slate-700 print:bg-gray-200 print:text-black">
+                <tr>
+                  <th className="p-3">کد رهگیری</th>
+                  <th className="p-3">نام</th>
+                  <th className="p-3">تماس</th>
+                  <th className="p-3">۴ رقم کارت</th>
+                  <th className="p-3">فیش/رسید</th>
+                  <th className="p-3">تاریخ</th>
+                  <th className="p-3 print:hidden">وضعیت</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-800 print:divide-gray-300">
+                {registrations.map((r: any) => (
+                  <tr key={r.id} className="hover:bg-slate-800/50 print:hover:bg-transparent">
+                    <td className="p-3 font-mono text-emerald-400 select-all print:text-black">{r.trackingCode || "—"}</td>
+                    <td className="p-3 font-medium text-white print:text-black">{r.fullName || r.name || "—"}</td>
+                    <td className="p-3 font-mono">{r.phone || r.mobile || (r as any).user?.phone || (r as any).user?.mobile || (r as any).phoneNumber || "—"}</td>
+                    <td className="p-3 font-mono font-bold text-amber-400 print:text-black">{r.cardLastDigits || "—"}</td>
+                    <td className="p-3">
+                      {(() => {
+                        const url = r.receiptUrl || ((typeof r.notes === "string" && r.notes.trim().startsWith("http")) ? r.notes.trim() : "");
+                        const isImg = url && /\.(png|jpe?g|webp|gif)(\?.*)?$/i.test(url);
+                        if (url && isImg) {
+                          return (
+                            <div className="flex items-center gap-2">
+                              <img
+                                src={url}
+                                alt="رسید"
+                                onClick={() => setPreviewImage(url)}
+                                className="w-10 h-10 object-cover rounded border border-slate-700 cursor-pointer hover:opacity-80 transition print:w-8 print:h-8"
+                                title="کلیک برای بزرگنمایی"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => setPreviewImage(url)}
+                                className="text-xs text-blue-400 underline print:hidden"
+                              >
+                                بزرگ‌نمایی
+                              </button>
+                            </div>
+                          );
+                        } else if (url) {
+                          return (
+                            <a href={url} target="_blank" rel="noreferrer" className="text-blue-400 underline print:text-black">
+                              مشاهده فایل
+                            </a>
+                          );
+                        } else if (r.notes) {
+                          return (
+                            <span className="text-xs opacity-80" title={r.notes}>
+                              {String(r.notes).length > 40 ? String(r.notes).slice(0, 40) + "…" : String(r.notes)}
+                            </span>
+                          );
+                        }
+                        return <span className="opacity-40">—</span>;
+                      })()}
+                    </td>
+                    <td className="p-3 text-xs text-slate-400 print:text-black">
+                      {r.createdAt ? new Date(r.createdAt).toLocaleDateString("fa-IR") : "—"}
+                    </td>
+
+                    <td className="p-3 print:hidden">
+                      <select
+                        value={r.status}
+                        onChange={(e) => handleChangeRegStatus(r.id, e.target.value as BootcampRegistrationStatus)}
+                        className="bg-slate-950 border border-slate-700 rounded px-2 py-1 text-xs text-white"
+                      >
+                        <option value="INITIAL">در انتظار</option>
+                        <option value="PAID">پرداخت‌شده</option>
+                        <option value="FINALIZED">نهایی‌شده</option>
+                        <option value="DONE">پایان‌یافته</option>
+                      </select>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      </div>
+
+      <div className="flex justify-end pt-3 border-t border-slate-800 print:hidden">
+        <Button variant="secondary" onClick={() => setRegModalBootcampId(null)}>
+          بستن
+        </Button>
+      </div>
     </div>
+  </div>
+)}
+</div>
   );
 }

@@ -1,0 +1,179 @@
+import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
+
+import { Bootcamp, listBootcamps } from "../api/bootcamps";
+import { listMyBootcampRegistrations } from "../api/bootcampRegistrations";
+
+import { BrandMascot } from "../components/BrandMascot";
+import { FormattedContent } from "../components/FormattedContent";
+import { Card, LoadError, Spinner } from "../components/ui";
+import { useAsync } from "../hooks/useAsync";
+import { UnifiedRegisterModal } from "../components/UnifiedRegisterModal";
+
+const STATUS_LABEL: Record<Bootcamp["status"], string> = {
+  LOCKED: "قفل‌شده",
+  COMING_SOON: "به‌زودی",
+  ACTIVE: "فعال",
+  DEADLINE_APPROACHING: "مهلت رو به پایان",
+  SUBMITTED: "ثبت‌شده",
+  COMPLETED: "تکمیل‌شده",
+};
+
+const STATUS_COLOR: Record<Bootcamp["status"], string> = {
+  LOCKED: "#6b7280",
+  COMING_SOON: "#8b8b8b",
+  ACTIVE: "var(--accent)",
+  DEADLINE_APPROACHING: "#e0a63f",
+  SUBMITTED: "#4fbf8f",
+  COMPLETED: "#4fbf8f",
+};
+
+function getRegButtonState(reg: any | undefined) {
+  if (!reg) return { label: "ثبت‌نام", disabled: false, variant: "primary" as const };
+
+  const status = reg.status as string | undefined;
+
+  if (status === "DONE" || status === "FINALIZED") {
+    return { label: "✓ ثبت‌نام شده", disabled: true, variant: "done" as const };
+  }
+
+  return { label: "تکمیل ثبت‌نام", disabled: false, variant: "secondary" as const };
+}
+
+export function BootcampsListPage() {
+  const [myRegistrations, setMyRegistrations] = useState<any[] | null>(null);
+  const [selectedBootcampIdForModal, setSelectedBootcampIdForModal] = useState<string | null>(null);
+
+  const fetchRegistrations = () => {
+    listMyBootcampRegistrations()
+      .then((res) => {
+        if (res.success && Array.isArray(res.data)) {
+          setMyRegistrations(res.data);
+        }
+      })
+      .catch(() => {});
+  };
+
+  useEffect(() => {
+    fetchRegistrations();
+  }, []);
+
+  const { data: bootcamps, error, loading, reload } = useAsync(() => listBootcamps());
+
+  if (error) return <LoadError message={error} onRetry={reload} />;
+
+  if (loading || !bootcamps) {
+    return (
+      <div className="flex justify-center py-16">
+        <Spinner />
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <h1 className="text-2xl font-bold">بوت‌کمپ‌ها / آکادمی</h1>
+
+      <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {bootcamps.map((b) => {
+          const userReg = myRegistrations?.find((r: any) => r.bootcampId === b.id);
+          const btn = getRegButtonState(userReg);
+          const hasRegistered = !!userReg;
+
+          return (
+            <div key={b.id} className="relative flex flex-col">
+              <Link to={`/dashboard/bootcamps/${b.id}`} className="flex flex-1 flex-col">
+                <Card className="glass flex h-full flex-col overflow-hidden p-0 transition-transform hover:-translate-y-1">
+                  {/* عکس کاور بدون هیچ تیزری */}
+                  <div className="relative h-56 w-full">
+                    {b.coverImageUrl ? (
+                      <img src={b.coverImageUrl} alt="" className="h-full w-full object-cover" />
+                    ) : (
+                      <div
+                        className="flex h-full w-full items-center justify-center"
+                        style={{ backgroundColor: "var(--surface)" }}
+                      >
+                        <div className="w-14">
+                          <BrandMascot />
+                        </div>
+                      </div>
+                    )}
+
+                    <span
+                      className="absolute top-3 right-3 rounded-full px-3.5 py-1 text-xs font-semibold shadow"
+                      style={{
+                        backgroundColor: "var(--bg)",
+                        color: hasRegistered ? "#4fbf8f" : STATUS_COLOR[b.status],
+                      }}
+                    >
+                      {hasRegistered ? "✓ ثبت‌نام شده" : STATUS_LABEL[b.status]}
+                    </span>
+                  </div>
+
+                  {/* بدنه کارت و توضیحات متنی برای همه */}
+                  <div className="flex flex-1 flex-col p-5">
+                    <div className="text-base font-bold">{b.title}</div>
+
+                    {b.description && (
+                      <div className="mt-2 text-sm opacity-80 line-clamp-3">
+                        <FormattedContent content={b.description} />
+                      </div>
+                    )}
+
+                    {/* دکمه با طراحی زیبا و ۳ حالته */}
+                    <div className="mt-4 pt-2">
+                      <button
+                        type="button"
+                        disabled={btn.disabled}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          if (!btn.disabled) {
+                            setSelectedBootcampIdForModal(b.id);
+                          }
+                        }}
+                        className={[
+                          "w-full rounded-xl py-2.5 px-4 text-sm font-bold shadow-md transition-all active:scale-95",
+                          btn.disabled
+                            ? "opacity-60 cursor-not-allowed bg-emerald-500/15 text-emerald-400 border border-emerald-500/20 shadow-none"
+                            : "hover:brightness-110",
+                          btn.variant === "primary"
+                            ? "bg-[var(--accent)] text-[var(--bg)] font-extrabold"
+                            : "",
+                          btn.variant === "secondary"
+                            ? "bg-amber-500/20 text-amber-300 border border-amber-500/30"
+                            : "",
+                        ].join(" ")}
+                      >
+                        {btn.label}
+                      </button>
+                    </div>
+
+                    <div className="mt-auto pt-4 flex items-center justify-between text-xs opacity-70 border-t border-white/5">
+                      <span>{new Date(b.date).toLocaleDateString("fa-IR")}</span>
+                      {b.instructor && <span>مربی: {b.instructor}</span>}
+                    </div>
+                  </div>
+                </Card>
+              </Link>
+            </div>
+          );
+        })}
+
+        {bootcamps.length === 0 && <p className="text-sm opacity-60">هنوز بوت‌کمپی تعریف نشده است.</p>}
+      </div>
+
+      {/* باز شدن مودال ثبت‌نام مستقیماً روی همین صفحه */}
+      {selectedBootcampIdForModal && (
+        <UnifiedRegisterModal
+          open={!!selectedBootcampIdForModal}
+          preselectBootcampId={selectedBootcampIdForModal}
+          onClose={() => {
+            setSelectedBootcampIdForModal(null);
+            fetchRegistrations();
+          }}
+        />
+      )}
+    </div>
+  );
+}

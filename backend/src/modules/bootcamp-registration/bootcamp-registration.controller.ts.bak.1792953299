@@ -1,0 +1,73 @@
+import { Request, Response } from "express";
+import * as service from "./bootcamp-registration.service";
+import { BootcampRegistrationStatus } from "@prisma/client";
+import { env } from "../../config/env";
+
+function assertAdmin(req: any) {
+  const role = req?.user?.role;
+  const roles = req?.user?.roles;
+  const isAdmin =
+    role === "ADMIN" || (Array.isArray(roles) && roles.includes("ADMIN"));
+
+  if (!isAdmin) {
+    const err: any = new Error("Forbidden: ADMIN only");
+    err.statusCode = 403;
+    throw err;
+  }
+}
+
+export async function uploadReceiptImage(req: Request, res: Response) {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: "فایلی ارسال نشده است." });
+    }
+    const fileUrl = `${env.backendUrl}/uploads/${req.file.filename}`;
+    res.status(201).json({ success: true, url: fileUrl });
+  } catch (error: any) {
+    res.status(400).json({ success: false, message: error.message });
+  }
+}
+
+export async function createPublicRegistration(req: Request, res: Response) {
+  try {
+    const reg = await service.registerForBootcamp(req.body);
+    res.json({ success: true, data: { trackingCode: reg.trackingCode, registration: reg } });
+  } catch (error: any) {
+    res.status(400).json({ success: false, message: error.message });
+  }
+}
+
+export async function getPublicStatus(req: Request, res: Response) {
+  try {
+    const reg = await service.getRegistrationByCode(req.params.code);
+    if (!reg) return res.status(404).json({ success: false, message: "Not found" });
+    res.json({ success: true, data: reg });
+  } catch (error: any) {
+    res.status(400).json({ success: false, message: error.message });
+  }
+}
+
+export async function getAdminRegistrations(req: Request, res: Response) {
+  try {
+    assertAdmin(req as any);
+
+    const bootcampId = (req.query.bootcampId as string) || "ALL";
+    const status = (req.query.status as BootcampRegistrationStatus | undefined);
+
+    const items = await service.listRegistrations({ bootcampId, status });
+    res.json({ success: true, data: items });
+  } catch (error: any) {
+    res.status(error.statusCode || 400).json({ success: false, message: error.message });
+  }
+}
+
+export async function patchAdminRegistration(req: Request, res: Response) {
+  try {
+    assertAdmin(req as any);
+
+    const updated = await service.updateRegistrationStatus(req.params.id, req.body);
+    res.json({ success: true, data: updated });
+  } catch (error: any) {
+    res.status(error.statusCode || 400).json({ success: false, message: error.message });
+  }
+}

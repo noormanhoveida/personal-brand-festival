@@ -71,7 +71,7 @@ export const TicketsPage: React.FC = () => {
           <h1 className="text-2xl font-bold text-gray-800">
             {isAdmin ? "مدیریت تیکت‌های کاربران" : "تیکت‌های پشتیبانی من"}
           </h1>
-          <p className="text-gray-500 text-sm">ارتباط مستقیم با تیم پشتیبانی و مدیریت</p>
+          <p className="text-zinc-400 text-sm">ارتباط مستقیم با تیم پشتیبانی و مدیریت</p>
         </div>
         {!isAdmin && (
           <button
@@ -87,7 +87,7 @@ export const TicketsPage: React.FC = () => {
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {/* لیست تیکت‌ها */}
-        <div className="bg-white rounded-xl shadow p-4 md:col-span-1 overflow-y-auto max-h-[70vh]">
+        <div className="bg-zinc-900/40 rounded-xl shadow p-4 md:col-span-1 overflow-y-auto max-h-[70vh]">
           {loading && tickets.length === 0 ? (
             <p className="text-gray-400 text-center py-4">در حال بارگذاری...</p>
           ) : tickets.length === 0 ? (
@@ -120,7 +120,7 @@ export const TicketsPage: React.FC = () => {
                   </span>
                 </div>
                 {isAdmin && t.user?.email && (
-                  <p className="text-xs text-gray-500 mb-1">کاربر: {t.user.email}</p>
+                  <p className="text-xs text-zinc-400 mb-1">کاربر: {t.user.email}</p>
                 )}
                 <span className="text-xs text-gray-400">
                   {new Date(t.updatedAt).toLocaleDateString("fa-IR")}
@@ -131,13 +131,13 @@ export const TicketsPage: React.FC = () => {
         </div>
 
         {/* پنل چت و جزئیات تیکت */}
-        <div className="bg-white rounded-xl shadow p-4 md:col-span-2 flex flex-col justify-between max-h-[70vh]">
+        <div className="bg-zinc-900/40 rounded-xl shadow p-4 md:col-span-2 flex flex-col justify-between max-h-[70vh]">
           {selectedTicket ? (
             <>
               <div className="border-b pb-3 mb-3 flex justify-between items-center">
                 <div>
                   <h2 className="font-bold text-lg text-gray-800">{selectedTicket.subject}</h2>
-                  <p className="text-xs text-gray-500">شناسه: {selectedTicket.id}</p>
+                  <p className="text-xs text-zinc-400">شناسه: {selectedTicket.id}</p>
                 </div>
                 <span className="text-xs font-medium text-indigo-600 bg-indigo-50 px-3 py-1 rounded-full">
                   وضعیت: {selectedTicket.status}
@@ -157,7 +157,7 @@ export const TicketsPage: React.FC = () => {
                         className={`max-w-[80%] p-3 rounded-lg text-sm ${
                           isMe
                             ? "bg-indigo-600 text-white rounded-bl-none"
-                            : "bg-white text-gray-800 border rounded-br-none shadow-sm"
+                            : "bg-zinc-900/40 text-gray-800 border rounded-br-none shadow-sm"
                         }`}
                       >
                         <p>{msg.message}</p>
@@ -202,7 +202,7 @@ export const TicketsPage: React.FC = () => {
       {/* مدال ساخت تیکت جدید */}
       {showNewModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-xl max-w-md w-full p-6">
+          <div className="bg-zinc-900/40 rounded-xl max-w-md w-full p-6">
             <h3 className="text-lg font-bold mb-4 text-gray-800">ثبت تیکت پشتیبانی جدید</h3>
             <form onSubmit={handleCreateTicket}>
               <div className="mb-4">

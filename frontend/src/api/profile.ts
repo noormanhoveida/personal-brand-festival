@@ -20,6 +20,7 @@ export interface ParticipantProfile {
   occupation?: string | null;
   bio?: string | null;
   interests: string[];
+  user?: { email?: string | null };
   slug: string;
   pageVisibility: "PRIVATE" | "EVALUATOR_ONLY" | "PARTICIPANTS_ONLY" | "PUBLIC";
 }

@@ -25,7 +25,7 @@ export async function uploadMedia(req: Request, res: Response, next: NextFunctio
 export async function list(_req: Request, res: Response, next: NextFunction) {
   try {
     const bootcamps = await listBootcamps();
-    res.status(200).json({ bootcamps });
+    res.status(200).json({ success: true, bootcamps, data: bootcamps });
   } catch (err) {
     next(err);
   }

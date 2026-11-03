@@ -8,3 +8,6 @@ frontend/.env
 .DS_Store
 .vscode/
 docker-data/
+
+# Never commit user-uploaded files
+/backend/uploads/

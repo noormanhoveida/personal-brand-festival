@@ -4,7 +4,8 @@
 // ==========================================================
 
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "debian-openssl-3.0.x"]
 }
 
 datasource db {
@@ -29,6 +30,14 @@ enum Visibility {
   EVALUATOR_ONLY
   PARTICIPANTS_ONLY
   PUBLIC
+}
+
+
+enum BootcampRegistrationStatus {
+  INITIAL
+  PAID
+  FINALIZED
+  DONE
 }
 
 enum BootcampStatus {
@@ -76,10 +85,22 @@ enum EndorsementVote {
 // ----------------------------------------------------------
 
 model User {
+  tickets   Ticket[]
+  bootcampAccesses   BootcampAccess[]
+  artifactRatings    ArtifactRating[]
+  artifactComments   ArtifactComment[]
   id                String              @id @default(uuid())
-  email             String              @unique
+  email             String?             @unique
+  phone             String?             @unique
   passwordHash      String
   role              Role                @default(PARTICIPANT)
+  isBlocked         Boolean             @default(false)
+  emailVerified     Boolean             @default(false)
+  phoneVerified     Boolean             @default(false)
+  passwordResetCodeHash    String?
+  passwordResetExpiresAt   DateTime?
+  emailVerification EmailVerificationCode?
+  phoneVerification PhoneVerificationCode?
   refreshTokens     RefreshToken[]
   participantProfile ParticipantProfile?
   evaluatorAssignments EvaluatorAssignment[]
@@ -87,6 +108,30 @@ model User {
   notifications     Notification[]
   createdAt         DateTime            @default(now())
   updatedAt         DateTime            @updatedAt
+}
+
+// A one-time 6-digit code emailed on registration (and re-sendable);
+// consumed and deleted the moment it verifies successfully. One row
+// per user — a resend overwrites the previous code rather than
+// stacking rows.
+model EmailVerificationCode {
+  id        String   @id @default(uuid())
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  code      String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+}
+
+// A one-time 6-digit code sent via SMS; one row per user —
+// a resend overwrites the previous code rather than stacking rows.
+model PhoneVerificationCode {
+  id        String   @id @default(uuid())
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  code      String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
 }
 
 model RefreshToken {
@@ -106,6 +151,7 @@ model Region {
 }
 
 model ParticipantProfile {
+  artifacts          Artifact[]
   id                String   @id @default(uuid())
   userId            String   @unique
   user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -135,8 +181,58 @@ model ParticipantProfile {
   evaluatorAssignments EvaluatorAssignment[]
   personalPage      PersonalPage?
 
+  livePresences        LivePresence[]
+  liveMessagesSent     LiveMessage[] @relation("LiveMessagesSent")
+  liveMessagesReceived LiveMessage[] @relation("LiveMessagesReceived")
+  preAssessment        PreAssessment?
+  leaderboardEntries   LeaderboardEntry[]
+  challengeSubmissions ChallengeSubmission[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  formAnswers FormAnswer[]
+}
+
+// ----------------------------------------------------------
+// PRE-ASSESSMENT (mandatory onboarding questionnaire, shown as a
+// blocking popup right after profile onboarding) — mirrors every
+// sheet of the coordinator's evaluation workbook 1:1:
+//   1) اطلاعات پایه      -> the fields below not already on
+//      ParticipantProfile/User (name, mobile, email, fieldOfStudy,
+//      professionalField are READ from those, never re-asked)
+//   2) خودارزیابی         -> selfAssessment (6 fixed axes; gap and the
+//      overall average/gap row are derived, not stored)
+//   3) سوالات کیفی         -> qualitativeAnswers (6 fixed questions)
+//   4) چک‌لیست حضور دیجیتال -> digitalPresence (8 fixed platforms;
+//      the totals row is derived, not stored)
+//   5) خلاصه و امتیاز کلی  -> derived entirely from the above for the
+//      coordinator's view, plus their one free-text note (coordinatorNote)
+// The three JSON arrays hold a fixed, known shape (see
+// live-session... no — see pre-assessment.constants.ts on the
+// backend, mirrored in the frontend form) rather than a dynamic
+// schema, since the questionnaire itself is fixed.
+// ----------------------------------------------------------
+
+model PreAssessment {
+  id            String             @id @default(uuid())
+  participantId String             @unique
+  participant   ParticipantProfile @relation(fields: [participantId], references: [id], onDelete: Cascade)
+
+  university         String?
+  linkedinUrl        String?
+  personalWebsiteUrl String?
+  instagramHandle    String?
+  programGoal        String?
+  goalDescription    String?
+
+  selfAssessment     Json // [{ axis, current: 1-10, target: 1-10 }]
+  qualitativeAnswers Json // [{ question, answer }]
+  digitalPresence    Json // [{ platform, has, lastUpdate?, followers?, quality? }]
+
+  coordinatorNote String?
+
+  submittedAt DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }
 
 model Media {
@@ -183,6 +279,8 @@ model SkillEndorsement {
 // ----------------------------------------------------------
 
 model JourneySection {
+  deletedAt     DateTime?
+  deletedBy     String?
   id          String   @id @default(uuid())
   key         String   @unique // e.g. "identity", "strengths"
   title       String
@@ -193,11 +291,17 @@ model JourneySection {
 }
 
 model Bootcamp {
+  registrations      BootcampRegistration[]
+  accesses           BootcampAccess[]
   id                 String   @id @default(uuid())
   title              String
   description        String?
   instructor         String?
   coverImageUrl      String?
+  teaserVideoUrl     String?
+  recordingUrl       String?
+  paymentCardNumber        String?  // شماره کارت جهت واریز
+  paymentAccountHolderName String?  // نام صاحب حساب
   date               DateTime
   startTime          DateTime
   endTime            DateTime
@@ -207,6 +311,93 @@ model Bootcamp {
   journeySection     JourneySection? @relation(fields: [journeySectionId], references: [id])
   tasks              Task[]
   questions          Question[]
+  liveSessions       LiveSession[]
+  forms              Form[]
+}
+
+// ----------------------------------------------------------
+// LIVE GROUP WORK (real-time bootcamp session: presence, grouping,
+// group chat, personal messages) — see LiveSession below.
+// ----------------------------------------------------------
+
+enum LiveSessionStatus {
+  OPEN    // check-in phase: participants join and appear on the manager's live list
+  GROUPED // manager has divided the online participants into groups; group screens are live
+  CLOSED  // session ended; everything stays readable as an archive
+}
+
+// One "live day" of a bootcamp: participants check in, the manager
+// splits whoever is online into groups, and each group gets a shared
+// chat space for the group work. A bootcamp can have several of these
+// over time (e.g. one per live session date).
+model LiveSession {
+  id          String   @id @default(uuid())
+  bootcampId  String
+  bootcamp    Bootcamp @relation(fields: [bootcampId], references: [id], onDelete: Cascade)
+  status      LiveSessionStatus @default(OPEN)
+  taskBrief   String?  // the group-work description shown once grouping is confirmed
+  createdAt   DateTime @default(now())
+  groupedAt   DateTime?
+  closedAt    DateTime?
+
+  presences   LivePresence[]
+  groups      LiveGroup[]
+  messages    LiveMessage[]
+}
+
+// One participant's check-in record for a session. Doubles as the
+// online/offline presence row (kept, not deleted, on disconnect — so
+// "who was online" stays part of the archive) and, once grouping is
+// confirmed, their group assignment.
+model LivePresence {
+  id            String   @id @default(uuid())
+  sessionId     String
+  session       LiveSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  participantId String
+  participant   ParticipantProfile @relation(fields: [participantId], references: [id], onDelete: Cascade)
+  online        Boolean  @default(true)
+  joinedAt      DateTime @default(now())
+  lastSeenAt    DateTime @default(now())
+  groupId       String?
+  group         LiveGroup? @relation(fields: [groupId], references: [id])
+
+  @@unique([sessionId, participantId])
+}
+
+// A group the manager formed out of the online participants for one
+// session's group work.
+model LiveGroup {
+  id         String   @id @default(uuid())
+  sessionId  String
+  session    LiveSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  name       String
+  createdAt  DateTime @default(now())
+
+  members    LivePresence[]
+  messages   LiveMessage[]
+}
+
+// A single chat message — group chat when groupId is set and
+// receiverId is null, or a personal (1:1) message when receiverId is
+// set (groupId may still be set, since personal messages happen
+// alongside a group's work). Every message and its optional
+// attachment URL is kept permanently, per spec.
+model LiveMessage {
+  id          String   @id @default(uuid())
+  sessionId   String
+  session     LiveSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  groupId     String?
+  group       LiveGroup? @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  senderId    String
+  sender      ParticipantProfile @relation("LiveMessagesSent", fields: [senderId], references: [id], onDelete: Cascade)
+  receiverId  String?
+  receiver    ParticipantProfile? @relation("LiveMessagesReceived", fields: [receiverId], references: [id], onDelete: Cascade)
+  content     String?
+  fileUrl     String?
+  createdAt   DateTime @default(now())
+
+  @@index([groupId])
+  @@index([receiverId])
 }
 
 enum QuestionInputType {
@@ -225,8 +416,8 @@ enum ApprovalStatus {
 }
 
 // An admin-defined context, e.g. "استخدام" (hiring), "دوستی" (friendship).
-    Traits carry a different weight depending on which situation they're
-    evaluated in. //
+// Traits carry a different weight depending on which situation they're
+// evaluated in.
 model Situation {
   id           String   @id @default(uuid())
   key          String   @unique
@@ -237,8 +428,8 @@ model Situation {
 }
 
 // The global pool of trait words (e.g. "همدل", "مهربان") a participant
-    can pick from when answering a TRAIT_TAG question — admin-managed,
-    bulk-loadable from Excel (up to ~1000 traits × N situations). //
+// can pick from when answering a TRAIT_TAG question — admin-managed,
+// bulk-loadable from Excel (up to ~1000 traits × N situations).
 model Trait {
   id        String   @id @default(uuid())
   name      String   @unique
@@ -247,9 +438,9 @@ model Trait {
 }
 
 // How much a trait counts for in a specific situation — e.g. "همدل"
-    weighs more than "مهربان" in a hiring situation. This is what makes
-    scoring automatic: no evaluator has to manually weigh a self-picked
-    trait tag. //
+// weighs more than "مهربان" in a hiring situation. This is what makes
+// scoring automatic: no evaluator has to manually weigh a self-picked
+// trait tag.
 model TraitWeight {
   id             String    @id @default(uuid())
   traitId        String
@@ -271,8 +462,15 @@ model Question {
   options          String[] @default([]) // choices for SINGLE_CHOICE / MULTI_CHOICE
   situationId      String?
   situation        Situation? @relation(fields: [situationId], references: [id])
-  traitId          String?  // set only on auto-generated per-trait situational questions
+  traitId          String?  // set on auto-generated AND explicitly-imported per-trait situational questions
   trait            Trait?   @relation(fields: [traitId], references: [id])
+  // Set only on questions imported directly from the "SituationalQuestions"
+  // sheet (explicit MCQ authoring), as opposed to questions auto-generated
+  // from trait phrasings via generateSituationalQuestions(). When present,
+  // computeAutoScore() uses these instead of the phrasing-match mechanic.
+  correctOption    String?  // "A" | "B" | "C" | "D" — kept as the letter, never converted to an index
+  weightCorrect    Int?
+  weightIncorrect  Int?
   journeySectionId String?
   journeySection   JourneySection? @relation(fields: [journeySectionId], references: [id])
   bootcampId       String?
@@ -281,6 +479,7 @@ model Question {
   order            Int      @default(0)
 
   @@unique([traitId, situationId])
+  formQuestions FormQuestion[]
 }
 
 model Task {
@@ -304,6 +503,9 @@ model TaskSubmission {
   approvalStatus ApprovalStatus @default(PENDING)
   approvedBy     String?
   approvedAt     DateTime?
+  // Set by the evaluator/manager alongside approval — feeds the
+  // "بیشترین امتیاز در تکالیف" leaderboard (see Leaderboard below).
+  score          Float?
 }
 
 // ----------------------------------------------------------
@@ -333,7 +535,7 @@ model ResponseVersion {
   createdAt     DateTime @default(now())
 
   // Auto-computed from TraitWeight when the parent question is a
-      TRAIT_TAG type — no evaluator scoring needed for this dimension. //
+  // TRAIT_TAG type — no evaluator scoring needed for this dimension.
   autoScore       Float?
   approvalStatus  ApprovalStatus @default(PENDING)
   approvedBy      String?
@@ -459,4 +661,464 @@ model ActivityLog {
   action    String
   meta      Json?
   createdAt DateTime @default(now())
+}
+
+// ----------------------------------------------------------
+// LEADERBOARDS ("تابلوی امتیاز") — every board a participant's
+// profile and the evaluator's leaderboard panel can show. SYSTEM
+// boards are computed live from existing data (see
+// leaderboard.constants.ts for the fixed list and
+// leaderboard.service.ts for how each is scored) — the Leaderboard
+// row for a SYSTEM board exists only to hold its title/description
+// and publish toggle, never LeaderboardEntry rows. CUSTOM boards are
+// entirely evaluator-authored: the evaluator defines what's being
+// scored, then manually scores participants one by one via
+// LeaderboardEntry.
+// ----------------------------------------------------------
+
+enum LeaderboardKind {
+  SYSTEM
+  CUSTOM
+}
+
+model Leaderboard {
+  id              String   @id @default(uuid())
+  key             String?  @unique // fixed identifier for SYSTEM boards; null for CUSTOM
+  kind            LeaderboardKind
+  title           String
+  description     String?
+  createdByUserId String? // set for CUSTOM boards
+  published       Boolean  @default(false)
+  publishedAt     DateTime?
+  entries         LeaderboardEntry[]
+  createdAt       DateTime @default(now())
+}
+
+model LeaderboardEntry {
+  id             String   @id @default(uuid())
+  leaderboardId  String
+  leaderboard    Leaderboard @relation(fields: [leaderboardId], references: [id], onDelete: Cascade)
+  participantId  String
+  participant    ParticipantProfile @relation(fields: [participantId], references: [id], onDelete: Cascade)
+  score          Float
+  note           String?
+  scoredByUserId String
+  scoredAt       DateTime @default(now())
+
+  @@unique([leaderboardId, participantId])
+}
+
+// ----------------------------------------------------------
+// WEEKLY CHALLENGES — admin-authored prompts; participants submit
+// work (any mix of text/photo/document/link) that both the evaluator
+// queue and, separately, the instructor can see.
+// ----------------------------------------------------------
+
+model WeeklyChallenge {
+  id              String   @id @default(uuid())
+  title           String
+  description     String
+  instructorName  String?
+  instructorEmail String?
+  opensAt         DateTime?
+  deadline        DateTime?
+  isActive        Boolean  @default(true)
+  createdByUserId String
+  createdAt       DateTime @default(now())
+  submissions     ChallengeSubmission[]
+}
+
+model ChallengeSubmission {
+  id             String   @id @default(uuid())
+  challengeId    String
+  challenge      WeeklyChallenge @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+  participantId  String
+  participant    ParticipantProfile @relation(fields: [participantId], references: [id], onDelete: Cascade)
+  textContent    String?
+  photoUrl       String?
+  documentUrl    String?
+  linkUrl        String?
+  submittedAt    DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  sentToInstructorAt DateTime?
+  versions       ChallengeSubmissionVersion[]
+
+  @@unique([challengeId, participantId])
+}
+
+model ChallengeSubmissionVersion {
+  id                    String              @id @default(uuid())
+  challengeSubmissionId String
+  challengeSubmission   ChallengeSubmission @relation(fields: [challengeSubmissionId], references: [id], onDelete: Cascade)
+  versionNumber         Int
+  textContent           String?
+  photoUrl              String?
+  documentUrl           String?
+  linkUrl               String?
+  createdAt             DateTime            @default(now())
+
+  @@unique([challengeSubmissionId, versionNumber])
+  @@index([challengeSubmissionId, createdAt])
+}
+
+
+
+// ----------------------------------------------------------
+// BOOTCAMP ACCESS PERMISSION (Mega download link access)
+// ----------------------------------------------------------
+model BootcampAccess {
+  id            String   @id @default(uuid())
+  bootcampId    String
+  bootcamp      Bootcamp @relation(fields: [bootcampId], references: [id], onDelete: Cascade)
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  grantedAt     DateTime @default(now())
+
+  @@unique([bootcampId, userId])
+}
+
+// ─── Form Builder ───────────────────────────────────────────────
+
+enum FormStatus {
+  DRAFT
+  ACTIVE
+  ARCHIVED
+}
+
+enum FormType {
+  EVALUATION
+  PRE_ASSESSMENT
+}
+
+enum AnswerStatus {
+  DRAFT
+  SUBMITTED
+}
+
+model Form {
+  id                    String          @id @default(cuid())
+  title                 String
+  slug                  String          @unique
+  description           String?
+  isActive              Boolean         @default(false)
+  status                FormStatus      @default(DRAFT)
+  type                  FormType        @default(EVALUATION)
+  themeConfig           Json?
+  startsAt              DateTime?
+  endsAt                DateTime?
+  bootcampId            String?
+  bootcamp              Bootcamp?       @relation(fields: [bootcampId], references: [id], onDelete: SetNull)
+  bootcampStatusTrigger BootcampStatus?
+  createdAt             DateTime        @default(now())
+  updatedAt             DateTime        @updatedAt
+
+  questions   FormQuestion[]
+  answers     FormAnswer[]
+}
+
+model FormQuestion {
+  id          String            @id @default(cuid())
+  formId      String
+  form        Form              @relation(fields: [formId], references: [id], onDelete: Cascade)
+
+  questionId  String?
+  question    Question?         @relation(fields: [questionId], references: [id])
+
+  label       String
+  helpText    String?
+  inputType   QuestionInputType @default(TEXT)
+  options     String[]          @default([])
+  isRequired  Boolean           @default(true)
+  weight      Float?
+  order       Int               @default(0)
+  config      Json?
+
+  createdAt   DateTime          @default(now())
+
+  answers     FormAnswerItem[]
+
+  @@unique([formId, order])
+}
+
+model FormAnswer {
+  id            String              @id @default(cuid())
+  formId        String
+  form          Form                @relation(fields: [formId], references: [id])
+
+  participantId String?
+  participant   ParticipantProfile? @relation(fields: [participantId], references: [id])
+
+  guestEmail    String?
+  guestName     String?
+
+  status        AnswerStatus @default(DRAFT)
+  totalScore    Float?
+  submittedAt   DateTime?
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  items         FormAnswerItem[]
+}
+
+model FormAnswerItem {
+  id             String       @id @default(cuid())
+  answerId       String
+  answer         FormAnswer   @relation(fields: [answerId], references: [id], onDelete: Cascade)
+
+  formQuestionId String
+  formQuestion   FormQuestion @relation(fields: [formQuestionId], references: [id])
+
+  value          Json
+  autoScore      Float?
+
+  createdAt      DateTime     @default(now())
+}
+
+
+model LandingSetting {
+  key       String   @id // e.g. "hero", "steps", "features"
+  data      Json     // ساختار JSON منعطف برای نگهداری تیترها، آیکون‌ها و کارت‌ها
+  updatedAt DateTime @updatedAt
+}
+
+
+// ----------------------------------------------------------
+// ARTIFACTS / AASAAR SYSTEM
+// ----------------------------------------------------------
+
+enum ArtifactStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum ArtifactMediaType {
+  VIDEO
+  AUDIO
+  LINK
+  DOCUMENT
+  IMAGE
+}
+
+model Artifact {
+  id              String             @id @default(uuid())
+  participantId  String
+  participant    ParticipantProfile @relation(fields: [participantId], references: [id], onDelete: Cascade)
+  
+  axis            String             // e.g. "تخصص من", "حرفه من", "مهارت من", "امضای من", "آینه من", "حضور من"
+  templateTitle   String             // e.g. "پایان‌نامه در ۹۰ ثانیه", "پادکست یا خبرنامه تخصصی"
+  title           String
+  description     String?
+  mediaType       ArtifactMediaType
+  mediaUrl        String             // لینک فایل، مدیا یا آدرس وب
+  coverImageUrl   String?            // تصویر شاخص یا پیش‌نمایش
+
+  status          ArtifactStatus     @default(PENDING)
+  adminNote       String?            // دلیل رد یا نظر داور
+
+  ratings         ArtifactRating[]
+  comments        ArtifactComment[]
+
+  averageRating   Float              @default(0)
+  ratingsCount    Int                @default(0)
+
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+
+  @@index([participantId, status])
+  @@index([axis, status])
+}
+
+model ArtifactRating {
+  id          String    @id @default(uuid())
+  artifactId  String
+  artifact    Artifact  @relation(fields: [artifactId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  score       Int       // 1 to 5
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@unique([artifactId, userId])
+  @@index([artifactId])
+}
+
+model ArtifactComment {
+  id              String            @id @default(uuid())
+  artifactId      String
+  artifact        Artifact          @relation(fields: [artifactId], references: [id], onDelete: Cascade)
+  userId          String
+  user            User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  content         String
+  parentId        String?
+  parent          ArtifactComment?  @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies         ArtifactComment[] @relation("CommentReplies")
+  likedUserIds    String[]          @default([])
+  dislikedUserIds String[]          @default([])
+  createdAt       DateTime          @default(now())
+
+  @@index([artifactId])
+  @@index([parentId])
+}
+
+// ==========================================
+// ANNOUNCEMENTS & TICKETS MODULE
+// ==========================================
+
+enum AnnouncementType {
+  INFO
+  WARNING
+  SUCCESS
+  URGENT
+}
+
+model Announcement {
+  id        String             @id @default(uuid())
+  title     String
+  content   String             @db.Text
+  type      AnnouncementType   @default(INFO)
+  isGlobal  Boolean            @default(true) // آیا برای همه است یا کاربر خاص؟
+  targetUserId String?         // اگر خالی نباشد، فقط برای این کاربر خاص است
+  isSent    Boolean            @default(false) // آیا ایمیلش ارسال شده؟
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+
+  @@index([targetUserId])
+}
+
+enum TicketStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+}
+
+enum SenderRole {
+  USER
+  ADMIN
+}
+
+model Ticket {
+  id        String          @id @default(uuid())
+  userId    String
+  user      User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subject   String
+  status    TicketStatus    @default(OPEN)
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+  messages  TicketMessage[]
+
+  @@index([userId])
+}
+
+model TicketMessage {
+  id        String     @id @default(uuid())
+  ticketId  String
+  ticket    Ticket     @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  senderId  String     // شناسه کاربری که پیام را فرستاده (چه کاربر و چه ادمین)
+  senderRole SenderRole @default(USER)
+  message   String     @db.Text
+  createdAt DateTime   @default(now())
+
+  @@index([ticketId])
+}
+
+
+enum SponsorPlacement {
+  DASHBOARD
+  LANDING_HERO
+  LANDING_VERTICAL
+}
+
+enum SponsorSlideType {
+  IMAGE
+  YOUTUBE
+}
+
+model Sponsor {
+  id              String           @id @default(cuid())
+  slug            String           @unique
+  name            String
+  tagline         String?
+  slideType       SponsorSlideType @default(IMAGE)
+  slideMediaUrl   String           // تصویر اسلاید یا لینک ویدیو
+  placement       SponsorPlacement @default(DASHBOARD)
+  order           Int              @default(0)
+  isActive        Boolean          @default(true)
+
+  // آمار بازدید و کلیک اسلایدر
+  viewCount       Int              @default(0)
+  clickCount      Int              @default(0)
+
+  // دکمه اقدام خارجی اختیاری
+  externalLinkLabel String?
+  externalLinkUrl   String?
+
+  // محتوای صفحه اختصاصی داخل سایت (/sponsors/:slug)
+  coverImageUrl   String?
+  fullDescription String?          @db.Text
+  websiteUrl      String?
+  instagramUrl    String?
+  linkedinUrl     String?
+  telegramUrl     String?
+
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  @@index([placement, isActive, order])
+}
+
+
+model BootcampRegistration {
+  id              String                     @id @default(uuid())
+  bootcampId      String
+  bootcamp        Bootcamp                   @relation(fields: [bootcampId], references: [id], onDelete: Cascade)
+  
+  fullName        String
+  mobile          String
+  email           String?
+  telegramId      String?                    // آیدی تلگرام
+  telegramPhone   String?                    // شماره تلگرام
+  notes           String?                    // توضیحات یا سوابق متقاضی
+  
+  status          BootcampRegistrationStatus @default(INITIAL)
+  trackingCode    String                     @unique @default(cuid())
+  finalMessage    String?                    // پیام اختصاصی یا متن نهایی ادمین
+  cardLastDigits  String?                    // ۴ رقم آخر کارت یا شماره پیگیری واریز
+  paidAt          DateTime?
+  finalizedAt     DateTime?
+
+  createdAt       DateTime                   @default(now())
+  updatedAt       DateTime                   @updatedAt
+
+  @@index([bootcampId])
+  @@index([status])
+}
+
+// ----------------------------------------------------------
+// APPLE-STYLE INTERACTIVE PAGE GUIDES
+// ----------------------------------------------------------
+
+model Guide {
+  id          String       @id @default(uuid())
+  pagePath    String       @unique // e.g. "/" or "/signup" or "/dashboard"
+  title       String?
+  isEnabled   Boolean      @default(true)
+  slides      GuideSlide[]
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+}
+
+model GuideSlide {
+  id          String   @id @default(uuid())
+  guideId     String
+  guide       Guide    @relation(fields: [guideId], references: [id], onDelete: Cascade)
+  title       String?
+  description String?
+  imageUrl    String?
+  order       Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([guideId, order])
 }

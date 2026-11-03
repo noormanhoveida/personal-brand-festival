@@ -90,8 +90,8 @@ export async function logout(req: Request, res: Response, next: NextFunction) {
 
 export async function verifyEmailCode(req: Request, res: Response, next: NextFunction) {
   try {
-    const { email, code } = req.body;
-    const { accessToken, refreshToken, role } = await verifyEmail(email, code);
+    const { email, code, firstName, lastName, telegramPhone, password } = req.body;
+    const { accessToken, refreshToken, role } = await verifyEmail(email, code, { firstName, lastName, telegramPhone, password });
     setRefreshCookie(res, refreshToken);
     res.status(200).json({ accessToken, role });
   } catch (err) {
