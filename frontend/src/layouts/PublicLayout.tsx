@@ -45,6 +45,7 @@ export function PublicLayout() {
                   <Link onClick={() => setDrawerOpen(false)} to="/community" className="py-2 opacity-80 hover:opacity-100">شرکت کنندگان</Link>
                   <Link onClick={() => setDrawerOpen(false)} to="/network" className="py-2 opacity-80 hover:opacity-100 font-bold" style={{ color: "var(--accent)" }}>شبکه ارتباطی</Link>
                   <Link onClick={() => setDrawerOpen(false)} to="/showcase" className="py-2 opacity-80 hover:opacity-100">برترین های جشنواره</Link>
+                  <Link onClick={() => setDrawerOpen(false)} to="/blog" className="py-2 opacity-80 hover:opacity-100">وبلاگ</Link>
                   <Link onClick={() => setDrawerOpen(false)} to="/business-showcase" className="py-2 opacity-80 hover:opacity-100 font-medium text-emerald-400">ویترین کسب‌وکارها</Link>
                   <Link onClick={() => setDrawerOpen(false)} to="/dashboard/bootcamps" className="py-2 opacity-80 hover:opacity-100">بوت‌کمپ‌ها / آکادمی</Link>
                 </nav>
@@ -88,6 +89,7 @@ export function PublicLayout() {
           <Link to="/community" className="opacity-80 hover:opacity-100">شرکت کنندگان</Link>
           <Link to="/network" className="opacity-80 hover:opacity-100">شبکه ارتباطی</Link>
           <Link to="/showcase" className="opacity-80 hover:opacity-100">برترین های جشنواره</Link>
+          <Link to="/blog" className="opacity-80 hover:opacity-100">وبلاگ</Link>
           <Link to="/business-showcase" className="opacity-80 hover:opacity-100 font-medium text-emerald-400">ویترین کسب‌وکارها</Link>
           <Link to="/dashboard/bootcamps" className="opacity-80 hover:opacity-100">بوت‌کمپ‌ها / آکادمی</Link>
           {hasToken ? (

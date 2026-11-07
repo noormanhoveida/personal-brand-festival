@@ -1,3 +1,4 @@
+import emailTemplateRoutes from '../email-templates/email-template.routes';
 import { Router } from "express";
 import { Role } from "@prisma/client";
 import { requireAuth } from "../../middleware/auth.middleware";
@@ -33,3 +34,5 @@ router.post("/regions", validateBody(createRegionSchema), addRegion);
 router.get("/participants", participants);
 
 export default router;
+
+router.use('/email-templates', emailTemplateRoutes);

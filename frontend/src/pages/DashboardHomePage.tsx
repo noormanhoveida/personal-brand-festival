@@ -13,6 +13,7 @@ import { Card, Spinner } from "../components/ui";
 import { SPONSORS_DATA } from "../data/sponsorsData";
 import { ApprovedArtifactsCarousel } from "../components/ApprovedArtifactsCarousel";
 import { getApprovedArtifacts } from "../api/artifact";
+import { workshop360Api } from "../api/workshop360";
 
 export function DashboardHomePage() {
   const [profile, setProfile] = useState<ParticipantProfile | null>(null);
@@ -23,6 +24,10 @@ export function DashboardHomePage() {
   const [points, setPoints] = useState<{ points: number; pending: number } | null>(null);
   const [pendingForms, setPendingForms] = useState<any[]>([]);
   const [approvedArtifacts, setApprovedArtifacts] = useState<any[]>([]);
+  const [pending360, setPending360] = useState<Array<{
+    sessionId: string; sessionTitle: string; sectionKey: string;
+    sectionTitle: string; role: string; targetCount: number;
+  }>>([]);
   const [loading, setLoading] = useState(true);
   const [loadErrors, setLoadErrors] = useState<string[]>([]);
 
@@ -42,10 +47,15 @@ export function DashboardHomePage() {
       listMyFeedback(),
       getMyPoints(),
       getApprovedArtifacts(),
-    ]).then(([pendingFormsRes, profileRes, bootcampsRes, responsesRes, feedbackRes, pointsRes, artifactsRes]) => {
+      workshop360Api.getMyPendingEvaluations(),
+    ]).then(([pendingFormsRes, profileRes, bootcampsRes, responsesRes, feedbackRes, pointsRes, artifactsRes, pending360Res]) => {
       if (artifactsRes && artifactsRes.status === "fulfilled") setApprovedArtifacts(artifactsRes.value || []);
       if (pendingFormsRes.status === "fulfilled") setPendingForms(pendingFormsRes.value);
+      if (pending360Res.status === "fulfilled" && Array.isArray(pending360Res.value)) {
+        setPending360(pending360Res.value);
+      }
       const errors: string[] = [];
+      if (pending360Res.status === "rejected") errors.push("ارزیابی ۳۶۰");
 
       if (profileRes.status === "fulfilled") {
         setProfile(profileRes.value.profile);
@@ -321,6 +331,23 @@ export function DashboardHomePage() {
           </Link>
         </div>
       </div>
+
+      {pending360.length > 0 && (
+        <section className="space-y-3">
+          <h2 className="text-sm font-semibold">فرم‌های ارزیابی ۳۶۰ کارگاه</h2>
+          {pending360.map((item) => (
+            <Link
+              key={`${item.sessionId}:${item.sectionKey}:${item.role}`}
+              to={`/dashboard/workshop-360/${encodeURIComponent(item.sessionId)}`}
+              className="glass block rounded-2xl p-4 transition hover:opacity-90"
+            >
+              <div className="font-semibold">{item.sessionTitle}</div>
+              <div className="mt-1 text-sm opacity-70">{item.sectionTitle}</div>
+              <div className="mt-2 text-xs">ورود به ارزیابی ←</div>
+            </Link>
+          ))}
+        </section>
+      )}
 
       <ApprovedArtifactsCarousel artifacts={approvedArtifacts} loading={loading} />
 

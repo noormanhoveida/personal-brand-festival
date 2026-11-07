@@ -165,7 +165,7 @@ function ChallengeCard({ challenge }: { challenge: WeeklyChallenge }) {
               {photoUrl && <img src={photoUrl} alt="" className="mt-1 h-16 rounded object-cover" />}
             </div>
             <div>
-              <label className="text-xs opacity-60">فایل / داکیومنت</label>
+              <label className="text-xs opacity-60">ویدیو / فایل پیوست (تا ۱۰۰MB)</label>
               <input
                 type="file"
                 onChange={(e) => e.target.files?.[0] && handleFileUpload(e.target.files[0], "document")}

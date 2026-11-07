@@ -1,3 +1,4 @@
+import { notifyNewFeedback } from '../email-templates/email-template.service';
 import crypto from "crypto";
 import { FeedbackVisibility } from "@prisma/client";
 import { prisma } from "../../config/db";
@@ -106,7 +107,7 @@ export async function submitFeedback(
     input.visibility ??
     (input.anonymous ? FeedbackVisibility.ANONYMOUS : FeedbackVisibility.PRIVATE);
 
-  return prisma.feedbackResponse.create({
+  const createdResponse = await prisma.feedbackResponse.create({
     data: {
       requestId: request.id,
       authorParticipantId,
@@ -115,6 +116,18 @@ export async function submitFeedback(
       visibility,
     },
   });
+
+  // ارسال ایمیل اطلاع‌رسانی به صاحب پروفایل در ثبت از طریق اسلاگ
+  const profileForUser = await prisma.participantProfile.findUnique({
+    where: { id: request.requesterId },
+    select: { userId: true },
+  });
+  if (profileForUser?.userId) {
+    const displayName = visibility === FeedbackVisibility.ANONYMOUS ? null : (input.authorName || null);
+    notifyNewFeedback(profileForUser.userId, displayName).catch(err => console.error("[FeedbackMailError-Slug]", err));
+  }
+
+  return createdResponse;
 }
 
 /**
@@ -171,7 +184,7 @@ export async function submitFeedbackBySlug(
     input.visibility ??
     (input.anonymous ? FeedbackVisibility.ANONYMOUS : FeedbackVisibility.PRIVATE);
 
-  return prisma.feedbackResponse.create({
+  const slugResponse = await prisma.feedbackResponse.create({
     data: {
       requestId: request.id,
       authorParticipantId,
@@ -180,6 +193,18 @@ export async function submitFeedbackBySlug(
       visibility,
     },
   });
+
+  const ownerProfile = await prisma.participantProfile.findUnique({
+    where: { id: request.requesterId },
+    select: { userId: true },
+  });
+  if (ownerProfile?.userId) {
+    const displayName = visibility === FeedbackVisibility.ANONYMOUS ? null : (input.authorName || null);
+    notifyNewFeedback(ownerProfile.userId, displayName)
+      .catch(err => console.error("[FeedbackMailError-Slug]", err));
+  }
+
+  return slugResponse;
 }
 
 /**

@@ -1,0 +1,260 @@
+import { prisma } from "../../config/db";
+import { sendMail } from "../../config/mailer";
+
+export interface DefaultTemplate {
+  key: string;
+  title: string;
+  subject: string;
+  body: string;
+}
+
+export const DEFAULT_TEMPLATES: Record<string, DefaultTemplate> = {
+  ANNOUNCEMENT: {
+    key: "ANNOUNCEMENT",
+    title: "اطلاعیه جدید فستیوال (قلاب ورود به سایت)",
+    subject: "📢 شما یک اطلاعیه جدید در جشنواره پرسنل برندینگ دارید",
+    body: `<div dir="rtl" style="font-family: Tahoma, Arial, sans-serif; line-height: 1.8; color: #222; max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 12px; padding: 24px; background: #ffffff;">
+  <h2 style="color: #d97706; margin-top: 0;">سلام {نام_کاربر} گرامی</h2>
+  <p style="font-size: 15px;">یک اطلاعیه جدید و مهم در وب‌سایت جشنواره برند شخصی منتشر شده است.</p>
+  <p style="font-size: 14px; color: #555;">با توجه به اهمیت محتوا و لزوم پیگیری مراحل، لطفاً جهت مطالعه متن کامل اطلاعیه به پنل کاربری خود مراجعه کنید.</p>
+  <div style="text-align: center; margin: 30px 0;">
+    <a href="{لینک_سایت}/dashboard/announcements" style="background: #d97706; color: #fff; text-decoration: none; padding: 12px 28px; border-radius: 8px; font-weight: bold; display: inline-block;">مشاهده اطلاعیه‌ها در سایت</a>
+  </div>
+  <hr style="border: none; border-top: 1px solid #edf2f7; margin: 20px 0;" />
+  <p style="font-size: 12px; color: #888; text-align: center;">جشنواره ملی برند شخصی دانش‌آموزی | pbfestival.ir</p>
+</div>`,
+  },
+  CHAT_DIGEST: {
+    key: "CHAT_DIGEST",
+    title: "خلاصه روزانه پیام‌های خوانده‌نشده چت",
+    subject: "💬 پیام‌های جدید خوانده‌نشده در گفتگوی جشنواره",
+    body: `<div dir="rtl" style="font-family: Tahoma, Arial, sans-serif; line-height: 1.8; color: #222; max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 12px; padding: 24px; background: #ffffff;">
+  <h2 style="color: #2563eb; margin-top: 0;">سلام {نام_کاربر} عزیز</h2>
+  <p style="font-size: 15px;">شما تعداد <b>{تعداد_پیام}</b> پیام خوانده‌نشده از کاربران زیر در سایت دارید:</p>
+  <div style="background: #f8fafc; border-right: 4px solid #2563eb; padding: 12px 16px; margin: 16px 0; border-radius: 4px; font-weight: bold; color: #1e293b;">
+    {اسامی_فرستندگان}
+  </div>
+  <p style="font-size: 14px; color: #555;">برای پاسخ به گفتگوها و مشاهده پیام‌های ارسالی، لطفاً وارد بخش چت سایت شوید:</p>
+  <div style="text-align: center; margin: 30px 0;">
+    <a href="{لینک_سایت}/dashboard/tickets" style="background: #2563eb; color: #fff; text-decoration: none; padding: 12px 28px; border-radius: 8px; font-weight: bold; display: inline-block;">ورود به پیام‌رسان سایت</a>
+  </div>
+  <hr style="border: none; border-top: 1px solid #edf2f7; margin: 20px 0;" />
+  <p style="font-size: 12px; color: #888; text-align: center;">جشنواره ملی برند شخصی دانش‌آموزی | pbfestival.ir</p>
+</div>`,
+  },
+  NEW_FEEDBACK: {
+    key: "NEW_FEEDBACK",
+    title: "اعلان دریافت بازخورد ۳۶۰ درجه جدید",
+    subject: "✨ شما یک بازخورد جدید در آینه من دریافت کردید",
+    body: `<div dir="rtl" style="font-family: Tahoma, Arial, sans-serif; line-height: 1.8; color: #222; max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 12px; padding: 24px; background: #ffffff;">
+  <h2 style="color: #059669; margin-top: 0;">سلام {نام_کاربر} عزیز</h2>
+  <p style="font-size: 15px;"><b>{نام_فرستنده}</b> برای شما در بخش بازخورد جشنواره نظر و ارزیابی جدیدی ثبت کرده است.</p>
+  <p style="font-size: 14px; color: #555;">شنیدن نظر دیگران گامی مؤثر در تقویت پرسنل برند شماست. جهت مشاهده پاسخ‌ها و تحلیل‌های بازخورد به سامانه مراجعه کنید:</p>
+  <div style="text-align: center; margin: 30px 0;">
+    <a href="{لینک_سایت}/dashboard" style="background: #059669; color: #fff; text-decoration: none; padding: 12px 28px; border-radius: 8px; font-weight: bold; display: inline-block;">مشاهده بازخورد در پنل</a>
+  </div>
+  <hr style="border: none; border-top: 1px solid #edf2f7; margin: 20px 0;" />
+  <p style="font-size: 12px; color: #888; text-align: center;">جشنواره ملی برند شخصی دانش‌آموزی | pbfestival.ir</p>
+</div>`,
+  },
+};
+
+export async function getTemplate(key: string) {
+  try {
+    let tpl = await (prisma as any).emailTemplate.findUnique({ where: { key } });
+    if (!tpl && DEFAULT_TEMPLATES[key]) {
+      const def = DEFAULT_TEMPLATES[key];
+      tpl = await (prisma as any).emailTemplate.create({
+        data: {
+          key: def.key,
+          title: def.title,
+          subject: def.subject,
+          body: def.body,
+          isActive: true,
+        },
+      });
+    }
+    return tpl || DEFAULT_TEMPLATES[key];
+  } catch (err) {
+    console.error(`[email-template] error fetching template ${key}:`, err);
+    return DEFAULT_TEMPLATES[key];
+  }
+}
+
+export async function getAllTemplates() {
+  const result: any[] = [];
+  for (const key of Object.keys(DEFAULT_TEMPLATES)) {
+    const tpl = await getTemplate(key);
+    result.push(tpl);
+  }
+  return result;
+}
+
+export async function updateTemplate(key: string, data: { subject?: string; body?: string; isActive?: boolean }) {
+  await getTemplate(key); // ensure exists
+  return (prisma as any).emailTemplate.update({
+    where: { key },
+    data: {
+      ...(data.subject !== undefined && { subject: data.subject }),
+      ...(data.body !== undefined && { body: data.body }),
+      ...(data.isActive !== undefined && { isActive: data.isActive }),
+    },
+  });
+}
+
+export function renderTemplate(templateStr: string, variables: Record<string, string | number>): string {
+  let output = templateStr;
+  for (const [k, v] of Object.entries(variables)) {
+    const safeVal = String(v ?? "");
+    // Replace {key}
+    output = output.split(`{${k}}`).join(safeVal);
+  }
+  return output;
+}
+
+const SITE_URL = process.env.APP_BASE_URL || "https://pbfestival.ir";
+
+export async function notifyNewAnnouncement(announcement: { id: string; title: string }) {
+  try {
+    const tpl = await getTemplate("ANNOUNCEMENT");
+    if (!tpl || tpl.isActive === false) return;
+
+    // پیدا کردن تمام کاربرانی که ایمیل دارند
+    const users = await prisma.user.findMany({
+      where: { email: { not: null }, isBlocked: false },
+      select: { id: true, email: true, participantProfile: { select: { fullName: true } } },
+    });
+
+    console.log(`[announcement:email] Sending hook emails to ${users.length} users...`);
+
+    for (const u of users) {
+      if (!u.email) continue;
+      const userName = u.participantProfile?.fullName || "شرکت‌کننده";
+      const vars = {
+        "نام_کاربر": userName,
+        "لینک_سایت": SITE_URL,
+      };
+
+      const finalSubject = renderTemplate(tpl.subject, vars);
+      const finalHtml = renderTemplate(tpl.body, vars);
+
+      // ارسال در پس‌زمینه بدون بلاک کردن درخواست
+      sendMail({
+        to: u.email,
+        subject: finalSubject,
+        html: finalHtml,
+      }).catch((e: any) => console.error(`Failed to send announcement email to ${u.email}:`, e.message));
+    }
+  } catch (err: any) {
+    console.error("[announcement:email] notify error:", err);
+  }
+}
+
+export async function notifyNewFeedback(requesterUserId: string, authorName?: string | null) {
+  try {
+    const tpl = await getTemplate("NEW_FEEDBACK");
+    if (!tpl || tpl.isActive === false) return;
+
+    const user = await prisma.user.findUnique({
+      where: { id: requesterUserId },
+      select: { email: true, participantProfile: { select: { fullName: true } } },
+    });
+
+    if (!user || !user.email) return;
+
+    const recipientName = user.participantProfile?.fullName || "همراه";
+    const senderDisplayName = authorName && authorName.trim().length > 0 ? authorName.trim() : "یک بازخورد ناشناس";
+
+    const vars = {
+      "نام_کاربر": recipientName,
+      "نام_فرستنده": senderDisplayName,
+      "لینک_سایت": SITE_URL,
+    };
+
+    const finalSubject = renderTemplate(tpl.subject, vars);
+    const finalHtml = renderTemplate(tpl.body, vars);
+
+    await sendMail({
+      to: user.email,
+      subject: finalSubject,
+      html: finalHtml,
+    });
+    console.log(`[feedback:email] Sent feedback notification to ${user.email}`);
+  } catch (err: any) {
+    console.error("[feedback:email] notify error:", err);
+  }
+}
+
+export async function sendDailyChatDigest() {
+  try {
+    const tpl = await getTemplate("CHAT_DIGEST");
+    if (!tpl || tpl.isActive === false) return { sentCount: 0, reason: "disabled" };
+
+    // پیدا کردن تمام پیام‌های نخوانده گروه‌بندی شده بر اساس گیرنده
+    const unreadMessages = await prisma.directMessage.findMany({
+      where: { isRead: false },
+      include: {
+        sender: {
+          select: { id: true, participantProfile: { select: { fullName: true } } },
+        },
+        receiver: {
+          select: { id: true, email: true, isBlocked: true, participantProfile: { select: { fullName: true } } },
+        },
+      },
+    });
+
+    if (!unreadMessages.length) {
+      return { sentCount: 0, reason: "no_unread" };
+    }
+
+    // ساخت مپ گیرنده‌ها
+    const digests: Record<string, { receiverEmail: string; receiverName: string; senders: Set<string>; count: number }> = {};
+
+    for (const msg of unreadMessages) {
+      if (!msg.receiver || !msg.receiver.email || msg.receiver.isBlocked) continue;
+      const recId = msg.receiver.id;
+      if (!digests[recId]) {
+        digests[recId] = {
+          receiverEmail: msg.receiver.email,
+          receiverName: msg.receiver.participantProfile?.fullName || "کاربر",
+          senders: new Set<string>(),
+          count: 0,
+        };
+      }
+      digests[recId].count += 1;
+      const senderName = msg.sender?.participantProfile?.fullName || "یکی از کاربران";
+      digests[recId].senders.add(senderName);
+    }
+
+    let sent = 0;
+    for (const [_, info] of Object.entries(digests)) {
+      const sendersList = Array.from(info.senders).join("، ");
+      const vars = {
+        "نام_کاربر": info.receiverName,
+        "اسامی_فرستندگان": sendersList,
+        "تعداد_پیام": info.count,
+        "لینک_سایت": SITE_URL,
+      };
+
+      const finalSubject = renderTemplate(tpl.subject, vars);
+      const finalHtml = renderTemplate(tpl.body, vars);
+
+      try {
+        await sendMail({
+          to: info.receiverEmail,
+          subject: finalSubject,
+          html: finalHtml,
+        });
+        sent++;
+      } catch (err: any) {
+        console.error(`[chat:digest] Error sending to ${info.receiverEmail}:`, err.message);
+      }
+    }
+
+    console.log(`[chat:digest] Daily digest sent to ${sent} users.`);
+    return { sentCount: sent };
+  } catch (err: any) {
+    console.error("[chat:digest] Run error:", err);
+    return { error: err.message };
+  }
+}

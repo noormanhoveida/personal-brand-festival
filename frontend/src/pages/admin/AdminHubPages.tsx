@@ -27,6 +27,20 @@ function HubTemplate({
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <Link
+          to="/dashboard/admin/fusion-reports"
+          className="p-5 bg-gradient-to-br from-indigo-900/30 to-purple-900/20 border border-indigo-700/40 rounded-2xl hover:border-indigo-500 transition-all block group"
+        >
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-2xl">📊</span>
+            <span className="text-xs bg-indigo-500/20 text-indigo-300 px-2 py-0.5 rounded-full font-mono">NEW</span>
+          </div>
+          <h3 className="text-lg font-bold text-white group-hover:text-indigo-300 transition-colors">گزارش تجمیعی فرم‌ها (Data Fusion)</h3>
+          <p className="text-sm text-gray-400 mt-2 leading-relaxed">
+            تجمیع و مقایسه دیدگاه شرکت‌کنندگان، مدرسان، ارزیابان و کادر اجرا با ماتریس هوش مصنوعی
+          </p>
+        </Link>
+
         {items.map((item) => (
           <Link key={item.to} to={item.to} className="group block focus:outline-none">
             <Card className="h-full p-5 transition-all duration-200 hover:-translate-y-1 hover:border-amber-500/50 hover:shadow-lg flex flex-col justify-between">
@@ -112,6 +126,12 @@ export function AdminSiteHubPage() {
       icon: "🧭",
       badge: "جدید",
     },
+    {
+      to: "/dashboard/admin/email-templates",
+      title: "قالب‌های ایمیل سیستم",
+      desc: "شخصی‌سازی متن، عناوین، متغیرها و ارسال آزمایشی ایمیل‌های اطلاع‌رسانی پلتفرم",
+      icon: "✉️",
+    },
   ];
 
   return (
@@ -143,6 +163,13 @@ export function AdminEvaluationHubPage() {
       title: "معیارهای ارزیابی",
       desc: "تعریف و تنظیم شاخص‌ها، اوزان و ماتریس‌های نمره‌دهی داوری",
       icon: "⚖️",
+    },
+    {
+      to: "/dashboard/admin/workshop-360",
+      title: "ارزیابی ۳۶۰ درجه کارگاه‌ها",
+      desc: "مدیریت جلسات ارزیابی چندبعدی، تخصیص نقش‌های تعاملی، پخش زنده بخش‌ها و گزارش ماتریسی",
+      icon: "🔄",
+      badge: "جدید",
     },
     {
       to: "/dashboard/admin/forms",

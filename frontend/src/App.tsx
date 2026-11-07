@@ -1,3 +1,12 @@
+import { Workshop360EvaluationPage } from "./pages/Workshop360EvaluationPage";
+import { Workshop360FormsEditorPage } from "./pages/admin/Workshop360FormsEditorPage";
+import { Workshop360ReportPage } from "./pages/admin/Workshop360ReportPage";
+import { Workshop360AdminSessionsPage } from "./pages/admin/Workshop360AdminSessionsPage";
+import { Workshop360AttendeesPage } from "./pages/admin/Workshop360AttendeesPage";
+import { Workshop360LiveAdminPage } from "./pages/admin/Workshop360LiveAdminPage";
+import { BlogListPage } from "./pages/blog/BlogListPage";
+import { BlogPostPage } from "./pages/blog/BlogPostPage";
+import { AdminBlogPage } from "./pages/admin/AdminBlogPage";
 import { AdminBusinessShowcasePage } from "./pages/admin/AdminBusinessShowcasePage";
 import { MyBusinessVideoPage } from "./pages/MyBusinessVideoPage";
 import { AdminSiteHubPage, AdminEvaluationHubPage, AdminAcademyHubPage, AdminScienceHubPage, AdminEconomyHubPage } from "./pages/admin/AdminHubPages";
@@ -44,6 +53,7 @@ import { AdminUsersPage } from "./pages/admin/AdminUsersPage";
 import { AdminRegionsPage } from "./pages/admin/AdminRegionsPage";
 import { AdminParticipantsPage } from "./pages/admin/AdminParticipantsPage";
 import { AdminSponsorsPage } from "./pages/dashboard/admin/AdminSponsorsPage";
+import AdminEmailTemplatesPage from "./pages/admin/AdminEmailTemplatesPage";
 import { AdminAssignmentsPage } from "./pages/admin/AdminAssignmentsPage";
 import { AdminCriteriaPage } from "./pages/admin/AdminCriteriaPage";
 import { AdminAnalyticsPage } from "./pages/admin/AdminAnalyticsPage";
@@ -64,6 +74,7 @@ import { ApprovalQueuePage } from "./pages/evaluator/ApprovalQueuePage";
 import { NotFoundPage } from "./pages/NotFoundPage";
 import { RequireAuth } from "./routes/RequireAuth";
 import PageGuide from "./components/PageGuide/PageGuide";
+import AdminFusionReportPage from "./pages/admin/AdminFusionReportPage";
 
 export function App() {
   return (
@@ -78,6 +89,8 @@ export function App() {
           <Route path="verify-email" element={<VerifyEmailPage />} />
           <Route path="showcase" element={<ShowcasePage />} />
           <Route path="business-showcase" element={<BusinessShowcasePage />} />
+          <Route path="blog" element={<BlogListPage />} />
+          <Route path="blog/:slug" element={<BlogPostPage />} />
         <Route path="network" element={<NetworkPage />} />
           <Route path="community" element={<CommunityPage />} />
           {/* Public — no account needed to open these */}
@@ -108,6 +121,7 @@ export function App() {
                       <Route path="tickets" element={<TicketsPage />} />
             <Route path="announcements" element={<AnnouncementsPage />} />
             <Route path="business-showcase" element={<MyBusinessVideoPage />} />
+            <Route path="workshop-360/:sessionId" element={<Workshop360EvaluationPage />} />
 </Route>
         </Route>
 
@@ -141,8 +155,11 @@ export function App() {
 
         <Route element={<RequireAuth allow={["ADMIN"]} />}>
           <Route path="dashboard/admin" element={<DashboardLayout />}>
+              <Route path="fusion-reports" element={<AdminFusionReportPage />} />
+
             <Route index element={<AdminOverviewPage />} />
             <Route path="hub-site" element={<AdminSiteHubPage />} />
+            <Route path="blog" element={<AdminBlogPage />} />
             <Route path="hub-eval" element={<AdminEvaluationHubPage />} />
             <Route path="hub-academy" element={<AdminAcademyHubPage />} />
             <Route path="hub-science" element={<AdminScienceHubPage />} />
@@ -164,12 +181,19 @@ export function App() {
             <Route path="regions" element={<AdminRegionsPage />} />
             <Route path="participants" element={<AdminParticipantsPage />} />
             <Route path="sponsors" element={<AdminSponsorsPage />} />
+            <Route path="email-templates" element={<AdminEmailTemplatesPage />} />
             <Route path="assignments" element={<AdminAssignmentsPage />} />
             <Route path="criteria" element={<AdminCriteriaPage />} />
             <Route path="analytics" element={<AdminAnalyticsPage />} />
             <Route path="showcase" element={<AdminShowcasePage />} />
             <Route path="landing" element={<AdminLandingPage />} />
             <Route path="forms" element={<AdminFormsPage />} />
+            <Route path="workshop-360" element={<Workshop360AdminSessionsPage />} />
+            <Route path="workshop-360/:id/forms" element={<Workshop360FormsEditorPage />} />
+            <Route path="workshop-360/:id/attendees" element={<Workshop360AttendeesPage />} />
+            <Route path="workshop-360/:id/live" element={<Workshop360LiveAdminPage />} />
+            <Route path="workshop-360/:id/report" element={<Workshop360ReportPage />} />
+
             <Route path="forms/:id" element={<AdminFormBuilderPage />} />
           </Route>
         </Route>

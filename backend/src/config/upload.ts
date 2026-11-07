@@ -50,13 +50,16 @@ const CHALLENGE_ALLOWED_MIME_TYPES = [
   "application/vnd.openxmlformats-officedocument.presentationml.presentation",
   "application/zip",
 ];
-const CHALLENGE_MAX_FILE_SIZE_BYTES = 20 * 1024 * 1024; // 20MB
+const CHALLENGE_MAX_FILE_SIZE_BYTES = 100 * 1024 * 1024; // 20MB
 
 export const challengeUpload = multer({
   storage,
   limits: { fileSize: CHALLENGE_MAX_FILE_SIZE_BYTES },
   fileFilter: (_req, file, cb) => {
-    if (!CHALLENGE_ALLOWED_MIME_TYPES.includes(file.mimetype)) {
+        const ext = path.extname(file.originalname).toLowerCase();
+    const allowedExts = [".jpg", ".jpeg", ".png", ".gif", ".webp", ".pdf", ".doc", ".docx", ".ppt", ".pptx", ".zip", ".mp4", ".webm", ".mov", ".m4v", ".avi", ".mkv"];
+    
+    if (!CHALLENGE_ALLOWED_MIME_TYPES.includes(file.mimetype) && !allowedExts.includes(ext)) {
       cb(new Error("نوع فایل مجاز نیست."));
       return;
     }

@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { apiClient } from '../../api/client';
 
 type ChatUser = {
@@ -6,6 +6,15 @@ type ChatUser = {
   name: string;
   avatarUrl: string | null;
   role?: string;
+};
+
+type Conversation = {
+  userId: string;
+  name: string;
+  avatarUrl: string | null;
+  lastMessage: string;
+  lastMessageAt: string;
+  unreadCount: number;
 };
 
 type Message = {
@@ -56,6 +65,7 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({
 }) => {
   const [me, setMe] = useState<ChatUser | null>(null);
   const [users, setUsers] = useState<ChatUser[]>([]);
+  const [conversations, setConversations] = useState<Conversation[]>([]);
   const [selectedId, setSelectedId] = useState(targetUserId || '');
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(0);
@@ -70,6 +80,32 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({
   const [listError, setListError] = useState('');
   const [chatError, setChatError] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
+  const conversationRequest = useRef(0);
+
+  const refreshConversations = useCallback(async () => {
+    if (!isOpen) return;
+    const request = ++conversationRequest.current;
+    try {
+      const res = await apiClient.get<{ success: boolean; data: Conversation[] }>(
+        '/chat/conversations'
+      );
+      if (request === conversationRequest.current) {
+        setConversations(Array.isArray(res.data.data) ? res.data.data : []);
+      }
+    } catch {
+      // خطای موقت نباید فهرست مکالمات قبلی را پاک کند.
+    }
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    void refreshConversations();
+    const timer = window.setInterval(() => { void refreshConversations(); }, 4000);
+    return () => {
+      conversationRequest.current++;
+      window.clearInterval(timer);
+    };
+  }, [isOpen, refreshConversations]);
 
   useEffect(() => {
     setSelectedId(targetUserId || '');
@@ -164,6 +200,7 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({
           setMessages(res.data.data);
           setChatError('');
           if (first) {
+            void refreshConversations();
             window.setTimeout(() => {
               if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
             }, 0);
@@ -182,7 +219,7 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({
       active = false;
       window.clearInterval(timer);
     };
-  }, [isOpen, selectedId]);
+  }, [isOpen, selectedId, refreshConversations]);
 
   useEffect(() => {
     const el = scrollRef.current;
@@ -202,6 +239,7 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({
       );
       const saved = res.data.data;
       setMessages((old) => old.some((m) => m.id === saved.id) ? old : [...old, saved]);
+      void refreshConversations();
       if (!content.startsWith('[sticker:')) setInputText('');
       setShowStickers(false);
       window.setTimeout(() => {
@@ -218,7 +256,23 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({
 
   if (!isOpen) return null;
 
-  const selectedUser = users.find((u) => u.id === selectedId);
+  const conversationById = new Map(conversations.map((c) => [c.userId, c]));
+  const query = search.trim().toLocaleLowerCase();
+  const recent = conversations
+    .filter((c) => !query || c.name.toLocaleLowerCase().includes(query))
+    .sort((a, b) => Date.parse(b.lastMessageAt) - Date.parse(a.lastMessageAt));
+  const recentIds = new Set(recent.map((c) => c.userId));
+  const displayedUsers: ChatUser[] = [
+    ...recent.map((c) => ({ id: c.userId, name: c.name, avatarUrl: c.avatarUrl })),
+    ...users.filter((u) => !recentIds.has(u.id)),
+  ];
+  const selectedConversation = conversationById.get(selectedId);
+  const selectedUser = users.find((u) => u.id === selectedId) ||
+    (selectedConversation ? {
+      id: selectedConversation.userId,
+      name: selectedConversation.name,
+      avatarUrl: selectedConversation.avatarUrl,
+    } : undefined);
   const selectedName = selectedUser?.name || targetUserName;
 
   return (
@@ -244,7 +298,7 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({
         <div className="flex-1 overflow-y-auto">
           {authError && <p className="p-4 text-sm text-amber-300">{authError}</p>}
           {listError && <p className="p-3 text-sm text-red-300">{listError}</p>}
-          {users.map((user) => (
+          {displayedUsers.map((user) => (
             <button
               key={user.id}
               type="button"
@@ -252,10 +306,27 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({
               className={`w-full text-right flex items-center gap-3 px-3 py-3 hover:bg-slate-800 border-b border-slate-800 ${selectedId === user.id ? 'bg-slate-800' : ''}`}
             >
               <Avatar name={user.name} url={user.avatarUrl} />
-              <span className="truncate text-sm">{user.name}</span>
+              <span className="min-w-0 flex-1">
+                <span className="flex items-center justify-between gap-2">
+                  <span className="truncate text-sm">{user.name}</span>
+                  {(conversationById.get(user.id)?.unreadCount ?? 0) > 0 && (
+                    <span
+                      className="shrink-0 min-w-5 rounded-full bg-red-500 px-1.5 text-center text-xs text-white"
+                      aria-label={`${conversationById.get(user.id)?.unreadCount} پیام خوانده‌نشده`}
+                    >
+                      {conversationById.get(user.id)?.unreadCount}
+                    </span>
+                  )}
+                </span>
+                {conversationById.get(user.id) && (
+                  <span className="block truncate text-xs text-slate-400">
+                    {conversationById.get(user.id)?.lastMessage}
+                  </span>
+                )}
+              </span>
             </button>
           ))}
-          {!loadingUsers && users.length === 0 && !listError && (
+          {!loadingUsers && displayedUsers.length === 0 && !listError && (
             <p className="p-4 text-sm text-slate-400">کاربری پیدا نشد.</p>
           )}
           {hasMore && (

@@ -32,7 +32,6 @@ enum Visibility {
   PUBLIC
 }
 
-
 enum BootcampRegistrationStatus {
   INITIAL
   PAID
@@ -85,34 +84,35 @@ enum EndorsementVote {
 // ----------------------------------------------------------
 
 model User {
-  tickets   Ticket[]
-  bootcampAccesses   BootcampAccess[]
-  artifactRatings    ArtifactRating[]
-  artifactComments   ArtifactComment[]
-  id                String              @id @default(uuid())
-  email             String?             @unique
-  phone             String?             @unique
-  passwordHash      String
-  role              Role                @default(PARTICIPANT)
-  isBlocked         Boolean             @default(false)
-  emailVerified     Boolean             @default(false)
-  phoneVerified     Boolean             @default(false)
-  passwordResetCodeHash    String?
-  passwordResetExpiresAt   DateTime?
-  emailVerification EmailVerificationCode?
-  phoneVerification PhoneVerificationCode?
-  refreshTokens     RefreshToken[]
-  participantProfile ParticipantProfile?
-  evaluatorAssignments EvaluatorAssignment[]
-  activityLogs      ActivityLog[]
-  notifications     Notification[]
-  sentDirectMessages     DirectMessage[]      @relation("SentDirectMessages")
-  receivedDirectMessages DirectMessage[]      @relation("ReceivedDirectMessages")
+  tickets                Ticket[]
+  bootcampAccesses       BootcampAccess[]
+  artifactRatings        ArtifactRating[]
+  artifactComments       ArtifactComment[]
+  id                     String                 @id @default(uuid())
+  email                  String?                @unique
+  phone                  String?                @unique
+  passwordHash           String
+  role                   Role                   @default(PARTICIPANT)
+  isBlocked              Boolean                @default(false)
+  emailVerified          Boolean                @default(false)
+  phoneVerified          Boolean                @default(false)
+  passwordResetCodeHash  String?
+  passwordResetExpiresAt DateTime?
+  emailVerification      EmailVerificationCode?
+  phoneVerification      PhoneVerificationCode?
+  refreshTokens          RefreshToken[]
+  participantProfile     ParticipantProfile?
+  evaluatorAssignments   EvaluatorAssignment[]
+  activityLogs           ActivityLog[]
+  notifications          Notification[]
+  sentDirectMessages     DirectMessage[]        @relation("SentDirectMessages")
+  receivedDirectMessages DirectMessage[]        @relation("ReceivedDirectMessages")
   businessVideos         BusinessVideo[]
   businessVideoComments  BusinessVideoComment[]
   businessVideoLikes     BusinessVideoLike[]
-  createdAt         DateTime            @default(now())
-  updatedAt         DateTime            @updatedAt
+  blogPosts              BlogPost[]
+  createdAt              DateTime               @default(now())
+  updatedAt              DateTime               @updatedAt
 }
 
 // A one-time 6-digit code emailed on registration (and re-sendable);
@@ -150,16 +150,16 @@ model RefreshToken {
 }
 
 model Region {
-  id           String              @id @default(uuid())
+  id           String               @id @default(uuid())
   name         String
   participants ParticipantProfile[]
 }
 
 model ParticipantProfile {
-  artifacts          Artifact[]
-  id                String   @id @default(uuid())
-  userId            String   @unique
-  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  artifacts         Artifact[]
+  id                String     @id @default(uuid())
+  userId            String     @unique
+  user              User       @relation(fields: [userId], references: [id], onDelete: Cascade)
   firstName         String
   lastName          String
   mobile            String
@@ -172,29 +172,29 @@ model ParticipantProfile {
   bio               String?
   interests         String[]
   regionId          String?
-  region            Region?  @relation(fields: [regionId], references: [id])
-  slug              String   @unique
+  region            Region?    @relation(fields: [regionId], references: [id])
+  slug              String     @unique
   pageVisibility    Visibility @default(PRIVATE)
 
-  media             Media[]
-  skills            Skill[]
-  responses         Response[]
-  taskSubmissions   TaskSubmission[]
-  feedbackRequestsMade   FeedbackRequest[] @relation("Requester")
-  feedbackResponsesGiven FeedbackResponse[] @relation("FeedbackAuthorParticipant")
-  evaluations       Evaluation[]
-  evaluatorAssignments EvaluatorAssignment[]
-  personalPage      PersonalPage?
+  media                  Media[]
+  skills                 Skill[]
+  responses              Response[]
+  taskSubmissions        TaskSubmission[]
+  feedbackRequestsMade   FeedbackRequest[]     @relation("Requester")
+  feedbackResponsesGiven FeedbackResponse[]    @relation("FeedbackAuthorParticipant")
+  evaluations            Evaluation[]
+  evaluatorAssignments   EvaluatorAssignment[]
+  personalPage           PersonalPage?
 
   livePresences        LivePresence[]
-  liveMessagesSent     LiveMessage[] @relation("LiveMessagesSent")
-  liveMessagesReceived LiveMessage[] @relation("LiveMessagesReceived")
+  liveMessagesSent     LiveMessage[]         @relation("LiveMessagesSent")
+  liveMessagesReceived LiveMessage[]         @relation("LiveMessagesReceived")
   preAssessment        PreAssessment?
   leaderboardEntries   LeaderboardEntry[]
   challengeSubmissions ChallengeSubmission[]
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
   formAnswers FormAnswer[]
 }
 
@@ -241,26 +241,26 @@ model PreAssessment {
 }
 
 model Media {
-  id            String   @id @default(uuid())
+  id            String             @id @default(uuid())
   participantId String
   participant   ParticipantProfile @relation(fields: [participantId], references: [id], onDelete: Cascade)
   type          MediaType
   url           String
   mimeType      String
   sizeBytes     Int
-  order         Int      @default(0)
-  createdAt     DateTime @default(now())
+  order         Int                @default(0)
+  createdAt     DateTime           @default(now())
 }
 
 /// A skill the participant claims to have (e.g. "Excel"). People who
 /// know them can endorse or reject it — a lightweight, LinkedIn-style
 /// trust signal that complements the platform's own evaluation engine.
 model Skill {
-  id            String   @id @default(uuid())
+  id            String             @id @default(uuid())
   participantId String
   participant   ParticipantProfile @relation(fields: [participantId], references: [id], onDelete: Cascade)
   name          String
-  createdAt     DateTime @default(now())
+  createdAt     DateTime           @default(now())
   endorsements  SkillEndorsement[]
 
   @@unique([participantId, name])
@@ -271,12 +271,12 @@ model Skill {
 /// people best placed to vouch for a skill are often outside the
 /// platform — colleagues, clients, classmates.
 model SkillEndorsement {
-  id           String   @id @default(uuid())
+  id           String          @id @default(uuid())
   skillId      String
-  skill        Skill    @relation(fields: [skillId], references: [id], onDelete: Cascade)
+  skill        Skill           @relation(fields: [skillId], references: [id], onDelete: Cascade)
   endorserName String?
   vote         EndorsementVote
-  createdAt    DateTime @default(now())
+  createdAt    DateTime        @default(now())
 }
 
 // ----------------------------------------------------------
@@ -284,10 +284,10 @@ model SkillEndorsement {
 // ----------------------------------------------------------
 
 model JourneySection {
-  deletedAt     DateTime?
-  deletedBy     String?
-  id          String   @id @default(uuid())
-  key         String   @unique // e.g. "identity", "strengths"
+  deletedAt   DateTime?
+  deletedBy   String?
+  id          String     @id @default(uuid())
+  key         String     @unique // e.g. "identity", "strengths"
   title       String
   description String?
   order       Int
@@ -296,28 +296,28 @@ model JourneySection {
 }
 
 model Bootcamp {
-  registrations      BootcampRegistration[]
-  accesses           BootcampAccess[]
-  id                 String   @id @default(uuid())
-  title              String
-  description        String?
-  instructor         String?
-  coverImageUrl      String?
-  teaserVideoUrl     String?
-  recordingUrl       String?
-  paymentCardNumber        String?  // شماره کارت جهت واریز
-  paymentAccountHolderName String?  // نام صاحب حساب
-  date               DateTime
-  startTime          DateTime
-  endTime            DateTime
-  status             BootcampStatus @default(COMING_SOON)
-  deadline           DateTime?
-  journeySectionId   String?
-  journeySection     JourneySection? @relation(fields: [journeySectionId], references: [id])
-  tasks              Task[]
-  questions          Question[]
-  liveSessions       LiveSession[]
-  forms              Form[]
+  registrations            BootcampRegistration[]
+  accesses                 BootcampAccess[]
+  id                       String                 @id @default(uuid())
+  title                    String
+  description              String?
+  instructor               String?
+  coverImageUrl            String?
+  teaserVideoUrl           String?
+  recordingUrl             String?
+  paymentCardNumber        String? // شماره کارت جهت واریز
+  paymentAccountHolderName String? // نام صاحب حساب
+  date                     DateTime
+  startTime                DateTime
+  endTime                  DateTime
+  status                   BootcampStatus         @default(COMING_SOON)
+  deadline                 DateTime?
+  journeySectionId         String?
+  journeySection           JourneySection?        @relation(fields: [journeySectionId], references: [id])
+  tasks                    Task[]
+  questions                Question[]
+  liveSessions             LiveSession[]
+  forms                    Form[]
 }
 
 // ----------------------------------------------------------
@@ -326,9 +326,9 @@ model Bootcamp {
 // ----------------------------------------------------------
 
 enum LiveSessionStatus {
-  OPEN    // check-in phase: participants join and appear on the manager's live list
+  OPEN // check-in phase: participants join and appear on the manager's live list
   GROUPED // manager has divided the online participants into groups; group screens are live
-  CLOSED  // session ended; everything stays readable as an archive
+  CLOSED // session ended; everything stays readable as an archive
 }
 
 // One "live day" of a bootcamp: participants check in, the manager
@@ -336,18 +336,18 @@ enum LiveSessionStatus {
 // chat space for the group work. A bootcamp can have several of these
 // over time (e.g. one per live session date).
 model LiveSession {
-  id          String   @id @default(uuid())
-  bootcampId  String
-  bootcamp    Bootcamp @relation(fields: [bootcampId], references: [id], onDelete: Cascade)
-  status      LiveSessionStatus @default(OPEN)
-  taskBrief   String?  // the group-work description shown once grouping is confirmed
-  createdAt   DateTime @default(now())
-  groupedAt   DateTime?
-  closedAt    DateTime?
+  id         String            @id @default(uuid())
+  bootcampId String
+  bootcamp   Bootcamp          @relation(fields: [bootcampId], references: [id], onDelete: Cascade)
+  status     LiveSessionStatus @default(OPEN)
+  taskBrief  String? // the group-work description shown once grouping is confirmed
+  createdAt  DateTime          @default(now())
+  groupedAt  DateTime?
+  closedAt   DateTime?
 
-  presences   LivePresence[]
-  groups      LiveGroup[]
-  messages    LiveMessage[]
+  presences LivePresence[]
+  groups    LiveGroup[]
+  messages  LiveMessage[]
 }
 
 // One participant's check-in record for a session. Doubles as the
@@ -355,16 +355,16 @@ model LiveSession {
 // "who was online" stays part of the archive) and, once grouping is
 // confirmed, their group assignment.
 model LivePresence {
-  id            String   @id @default(uuid())
+  id            String             @id @default(uuid())
   sessionId     String
-  session       LiveSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  session       LiveSession        @relation(fields: [sessionId], references: [id], onDelete: Cascade)
   participantId String
   participant   ParticipantProfile @relation(fields: [participantId], references: [id], onDelete: Cascade)
-  online        Boolean  @default(true)
-  joinedAt      DateTime @default(now())
-  lastSeenAt    DateTime @default(now())
+  online        Boolean            @default(true)
+  joinedAt      DateTime           @default(now())
+  lastSeenAt    DateTime           @default(now())
   groupId       String?
-  group         LiveGroup? @relation(fields: [groupId], references: [id])
+  group         LiveGroup?         @relation(fields: [groupId], references: [id])
 
   @@unique([sessionId, participantId])
 }
@@ -372,14 +372,14 @@ model LivePresence {
 // A group the manager formed out of the online participants for one
 // session's group work.
 model LiveGroup {
-  id         String   @id @default(uuid())
-  sessionId  String
-  session    LiveSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  name       String
-  createdAt  DateTime @default(now())
+  id        String      @id @default(uuid())
+  sessionId String
+  session   LiveSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  name      String
+  createdAt DateTime    @default(now())
 
-  members    LivePresence[]
-  messages   LiveMessage[]
+  members  LivePresence[]
+  messages LiveMessage[]
 }
 
 // A single chat message — group chat when groupId is set and
@@ -388,18 +388,18 @@ model LiveGroup {
 // alongside a group's work). Every message and its optional
 // attachment URL is kept permanently, per spec.
 model LiveMessage {
-  id          String   @id @default(uuid())
-  sessionId   String
-  session     LiveSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  groupId     String?
-  group       LiveGroup? @relation(fields: [groupId], references: [id], onDelete: Cascade)
-  senderId    String
-  sender      ParticipantProfile @relation("LiveMessagesSent", fields: [senderId], references: [id], onDelete: Cascade)
-  receiverId  String?
-  receiver    ParticipantProfile? @relation("LiveMessagesReceived", fields: [receiverId], references: [id], onDelete: Cascade)
-  content     String?
-  fileUrl     String?
-  createdAt   DateTime @default(now())
+  id         String              @id @default(uuid())
+  sessionId  String
+  session    LiveSession         @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  groupId    String?
+  group      LiveGroup?          @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  senderId   String
+  sender     ParticipantProfile  @relation("LiveMessagesSent", fields: [senderId], references: [id], onDelete: Cascade)
+  receiverId String?
+  receiver   ParticipantProfile? @relation("LiveMessagesReceived", fields: [receiverId], references: [id], onDelete: Cascade)
+  content    String?
+  fileUrl    String?
+  createdAt  DateTime            @default(now())
 
   @@index([groupId])
   @@index([receiverId])
@@ -424,20 +424,20 @@ enum ApprovalStatus {
 // Traits carry a different weight depending on which situation they're
 // evaluated in.
 model Situation {
-  id           String   @id @default(uuid())
-  key          String   @unique
+  id           String        @id @default(uuid())
+  key          String        @unique
   title        String
   traitWeights TraitWeight[]
   questions    Question[]
-  createdAt    DateTime @default(now())
+  createdAt    DateTime      @default(now())
 }
 
 // The global pool of trait words (e.g. "همدل", "مهربان") a participant
 // can pick from when answering a TRAIT_TAG question — admin-managed,
 // bulk-loadable from Excel (up to ~1000 traits × N situations).
 model Trait {
-  id        String   @id @default(uuid())
-  name      String   @unique
+  id        String        @id @default(uuid())
+  name      String        @unique
   weights   TraitWeight[]
   questions Question[]
 }
@@ -452,58 +452,58 @@ model TraitWeight {
   trait          Trait     @relation(fields: [traitId], references: [id], onDelete: Cascade)
   situationId    String
   situation      Situation @relation(fields: [situationId], references: [id], onDelete: Cascade)
-  weight         Float     // امتیاز وقتی این نحوه بیان در موقعیت خودش انتخاب شود
-  text           String?   // نحوه بیان این صفت مخصوص این موقعیت — اگر خالی باشد، نام صفت نمایش داده می‌شود
+  weight         Float // امتیاز وقتی این نحوه بیان در موقعیت خودش انتخاب شود
+  text           String? // نحوه بیان این صفت مخصوص این موقعیت — اگر خالی باشد، نام صفت نمایش داده می‌شود
   mismatchWeight Float     @default(0) // امتیاز وقتی این نحوه بیان در موقعیتی غیر از موقعیت خودش انتخاب شود
 
   @@unique([traitId, situationId])
 }
 
 model Question {
-  id               String   @id @default(uuid())
+  id               String            @id @default(uuid())
   text             String
   stage            ResponseStage
   inputType        QuestionInputType @default(TEXT)
-  options          String[] @default([]) // choices for SINGLE_CHOICE / MULTI_CHOICE
+  options          String[]          @default([]) // choices for SINGLE_CHOICE / MULTI_CHOICE
   situationId      String?
-  situation        Situation? @relation(fields: [situationId], references: [id])
-  traitId          String?  // set on auto-generated AND explicitly-imported per-trait situational questions
-  trait            Trait?   @relation(fields: [traitId], references: [id])
+  situation        Situation?        @relation(fields: [situationId], references: [id])
+  traitId          String? // set on auto-generated AND explicitly-imported per-trait situational questions
+  trait            Trait?            @relation(fields: [traitId], references: [id])
   // Set only on questions imported directly from the "SituationalQuestions"
   // sheet (explicit MCQ authoring), as opposed to questions auto-generated
   // from trait phrasings via generateSituationalQuestions(). When present,
   // computeAutoScore() uses these instead of the phrasing-match mechanic.
-  correctOption    String?  // "A" | "B" | "C" | "D" — kept as the letter, never converted to an index
+  correctOption    String? // "A" | "B" | "C" | "D" — kept as the letter, never converted to an index
   weightCorrect    Int?
   weightIncorrect  Int?
   journeySectionId String?
-  journeySection   JourneySection? @relation(fields: [journeySectionId], references: [id])
+  journeySection   JourneySection?   @relation(fields: [journeySectionId], references: [id])
   bootcampId       String?
-  bootcamp         Bootcamp? @relation(fields: [bootcampId], references: [id])
+  bootcamp         Bootcamp?         @relation(fields: [bootcampId], references: [id])
   responses        Response[]
-  order            Int      @default(0)
+  order            Int               @default(0)
+  formQuestions    FormQuestion[]
 
   @@unique([traitId, situationId])
-  formQuestions FormQuestion[]
 }
 
 model Task {
-  id          String   @id @default(uuid())
+  id          String           @id @default(uuid())
   bootcampId  String
-  bootcamp    Bootcamp @relation(fields: [bootcampId], references: [id], onDelete: Cascade)
+  bootcamp    Bootcamp         @relation(fields: [bootcampId], references: [id], onDelete: Cascade)
   title       String
   description String?
   submissions TaskSubmission[]
 }
 
 model TaskSubmission {
-  id            String   @id @default(uuid())
+  id            String             @id @default(uuid())
   taskId        String
-  task          Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  task          Task               @relation(fields: [taskId], references: [id], onDelete: Cascade)
   participantId String
   participant   ParticipantProfile @relation(fields: [participantId], references: [id], onDelete: Cascade)
   content       String
-  createdAt     DateTime @default(now())
+  createdAt     DateTime           @default(now())
 
   approvalStatus ApprovalStatus @default(PENDING)
   approvedBy     String?
@@ -518,33 +518,33 @@ model TaskSubmission {
 // ----------------------------------------------------------
 
 model Response {
-  id            String   @id @default(uuid())
+  id            String             @id @default(uuid())
   participantId String
   participant   ParticipantProfile @relation(fields: [participantId], references: [id], onDelete: Cascade)
   questionId    String
-  question      Question @relation(fields: [questionId], references: [id])
-  visibility    Visibility @default(PRIVATE)
+  question      Question           @relation(fields: [questionId], references: [id])
+  visibility    Visibility         @default(PRIVATE)
   versions      ResponseVersion[]
-  createdAt     DateTime @default(now())
+  createdAt     DateTime           @default(now())
 }
 
 model ResponseVersion {
-  id            String   @id @default(uuid())
+  id            String        @id @default(uuid())
   responseId    String
-  response      Response @relation(fields: [responseId], references: [id], onDelete: Cascade)
+  response      Response      @relation(fields: [responseId], references: [id], onDelete: Cascade)
   versionNumber Int
   content       String
   stage         ResponseStage
   bootcampId    String?
   createdBy     String
-  createdAt     DateTime @default(now())
+  createdAt     DateTime      @default(now())
 
   // Auto-computed from TraitWeight when the parent question is a
   // TRAIT_TAG type — no evaluator scoring needed for this dimension.
-  autoScore       Float?
-  approvalStatus  ApprovalStatus @default(PENDING)
-  approvedBy      String?
-  approvedAt      DateTime?
+  autoScore      Float?
+  approvalStatus ApprovalStatus @default(PENDING)
+  approvedBy     String?
+  approvedAt     DateTime?
 
   @@unique([responseId, versionNumber])
 }
@@ -554,25 +554,25 @@ model ResponseVersion {
 // ----------------------------------------------------------
 
 model FeedbackRequest {
-  id            String   @id @default(uuid())
-  requesterId   String
-  requester     ParticipantProfile @relation("Requester", fields: [requesterId], references: [id], onDelete: Cascade)
-  linkToken     String   @unique
-  createdAt     DateTime @default(now())
-  expiresAt     DateTime?
-  responses     FeedbackResponse[]
+  id          String             @id @default(uuid())
+  requesterId String
+  requester   ParticipantProfile @relation("Requester", fields: [requesterId], references: [id], onDelete: Cascade)
+  linkToken   String             @unique
+  createdAt   DateTime           @default(now())
+  expiresAt   DateTime?
+  responses   FeedbackResponse[]
 }
 
 model FeedbackResponse {
-  id                  String   @id @default(uuid())
+  id                  String              @id @default(uuid())
   requestId           String
-  request             FeedbackRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  request             FeedbackRequest     @relation(fields: [requestId], references: [id], onDelete: Cascade)
   authorParticipantId String?
   authorParticipant   ParticipantProfile? @relation("FeedbackAuthorParticipant", fields: [authorParticipantId], references: [id])
-  authorName          String?  // for non-participant respondents
-  answers             Json     // { q1: "...", q2: "...", ... }
-  visibility          FeedbackVisibility @default(PRIVATE)
-  createdAt           DateTime @default(now())
+  authorName          String? // for non-participant respondents
+  answers             Json // { q1: "...", q2: "...", ... }
+  visibility          FeedbackVisibility  @default(PRIVATE)
+  createdAt           DateTime            @default(now())
 }
 
 // ----------------------------------------------------------
@@ -580,32 +580,32 @@ model FeedbackResponse {
 // ----------------------------------------------------------
 
 model EvaluationCriterion {
-  id          String   @id @default(uuid())
-  key         String   @unique
+  id          String            @id @default(uuid())
+  key         String            @unique
   title       String
   description String?
-  weight      Float    // configurable, sums to 1.0 across active criteria
+  weight      Float // configurable, sums to 1.0 across active criteria
   scores      EvaluationScore[]
 }
 
 model Evaluation {
-  id                  String   @id @default(uuid())
+  id                  String             @id @default(uuid())
   participantId       String
   participant         ParticipantProfile @relation(fields: [participantId], references: [id], onDelete: Cascade)
-  evaluatorUserId      String
-  status              EvaluationStatus @default(DRAFT)
+  evaluatorUserId     String
+  status              EvaluationStatus   @default(DRAFT)
   transformationScore Float?
   finalScore          Float?
   comment             String?
   scores              EvaluationScore[]
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
 }
 
 model EvaluationScore {
-  id           String   @id @default(uuid())
+  id           String              @id @default(uuid())
   evaluationId String
-  evaluation   Evaluation @relation(fields: [evaluationId], references: [id], onDelete: Cascade)
+  evaluation   Evaluation          @relation(fields: [evaluationId], references: [id], onDelete: Cascade)
   criterionId  String
   criterion    EvaluationCriterion @relation(fields: [criterionId], references: [id])
   score        Float
@@ -615,12 +615,12 @@ model EvaluationScore {
 }
 
 model EvaluatorAssignment {
-  id            String   @id @default(uuid())
+  id              String             @id @default(uuid())
   evaluatorUserId String
-  evaluatorUser User     @relation(fields: [evaluatorUserId], references: [id], onDelete: Cascade)
-  participantId String
-  participant   ParticipantProfile @relation(fields: [participantId], references: [id], onDelete: Cascade)
-  createdAt     DateTime @default(now())
+  evaluatorUser   User               @relation(fields: [evaluatorUserId], references: [id], onDelete: Cascade)
+  participantId   String
+  participant     ParticipantProfile @relation(fields: [participantId], references: [id], onDelete: Cascade)
+  createdAt       DateTime           @default(now())
 
   @@unique([evaluatorUserId, participantId])
 }
@@ -630,20 +630,20 @@ model EvaluatorAssignment {
 // ----------------------------------------------------------
 
 model PersonalPage {
-  id            String   @id @default(uuid())
-  participantId String   @unique
-  participant   ParticipantProfile @relation(fields: [participantId], references: [id], onDelete: Cascade)
-  tagline       String?
-  identityWords String[]
-  strengthsJson Json?
-  valuesJson    Json?
-  introText     String?
-  introMediaUrl String?
-  roadmapText   String?
-  featured      Boolean  @default(false)
-  finalist      Boolean  @default(false)
+  id             String             @id @default(uuid())
+  participantId  String             @unique
+  participant    ParticipantProfile @relation(fields: [participantId], references: [id], onDelete: Cascade)
+  tagline        String?
+  identityWords  String[]
+  strengthsJson  Json?
+  valuesJson     Json?
+  introText      String?
+  introMediaUrl  String?
+  roadmapText    String?
+  featured       Boolean            @default(false)
+  finalist       Boolean            @default(false)
   winnerCategory String?
-  publishedAt   DateTime?
+  publishedAt    DateTime?
 }
 
 // ----------------------------------------------------------
@@ -687,28 +687,28 @@ enum LeaderboardKind {
 }
 
 model Leaderboard {
-  id              String   @id @default(uuid())
-  key             String?  @unique // fixed identifier for SYSTEM boards; null for CUSTOM
+  id              String             @id @default(uuid())
+  key             String?            @unique // fixed identifier for SYSTEM boards; null for CUSTOM
   kind            LeaderboardKind
   title           String
   description     String?
   createdByUserId String? // set for CUSTOM boards
-  published       Boolean  @default(false)
+  published       Boolean            @default(false)
   publishedAt     DateTime?
   entries         LeaderboardEntry[]
-  createdAt       DateTime @default(now())
+  createdAt       DateTime           @default(now())
 }
 
 model LeaderboardEntry {
-  id             String   @id @default(uuid())
+  id             String             @id @default(uuid())
   leaderboardId  String
-  leaderboard    Leaderboard @relation(fields: [leaderboardId], references: [id], onDelete: Cascade)
+  leaderboard    Leaderboard        @relation(fields: [leaderboardId], references: [id], onDelete: Cascade)
   participantId  String
   participant    ParticipantProfile @relation(fields: [participantId], references: [id], onDelete: Cascade)
   score          Float
   note           String?
   scoredByUserId String
-  scoredAt       DateTime @default(now())
+  scoredAt       DateTime           @default(now())
 
   @@unique([leaderboardId, participantId])
 }
@@ -720,33 +720,33 @@ model LeaderboardEntry {
 // ----------------------------------------------------------
 
 model WeeklyChallenge {
-  id              String   @id @default(uuid())
+  id              String                @id @default(uuid())
   title           String
   description     String
   instructorName  String?
   instructorEmail String?
   opensAt         DateTime?
   deadline        DateTime?
-  isActive        Boolean  @default(true)
+  isActive        Boolean               @default(true)
   createdByUserId String
-  createdAt       DateTime @default(now())
+  createdAt       DateTime              @default(now())
   submissions     ChallengeSubmission[]
 }
 
 model ChallengeSubmission {
-  id             String   @id @default(uuid())
-  challengeId    String
-  challenge      WeeklyChallenge @relation(fields: [challengeId], references: [id], onDelete: Cascade)
-  participantId  String
-  participant    ParticipantProfile @relation(fields: [participantId], references: [id], onDelete: Cascade)
-  textContent    String?
-  photoUrl       String?
-  documentUrl    String?
-  linkUrl        String?
-  submittedAt    DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  id                 String                       @id @default(uuid())
+  challengeId        String
+  challenge          WeeklyChallenge              @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+  participantId      String
+  participant        ParticipantProfile           @relation(fields: [participantId], references: [id], onDelete: Cascade)
+  textContent        String?
+  photoUrl           String?
+  documentUrl        String?
+  linkUrl            String?
+  submittedAt        DateTime                     @default(now())
+  updatedAt          DateTime                     @updatedAt
   sentToInstructorAt DateTime?
-  versions       ChallengeSubmissionVersion[]
+  versions           ChallengeSubmissionVersion[]
 
   @@unique([challengeId, participantId])
 }
@@ -766,18 +766,16 @@ model ChallengeSubmissionVersion {
   @@index([challengeSubmissionId, createdAt])
 }
 
-
-
 // ----------------------------------------------------------
 // BOOTCAMP ACCESS PERMISSION (Mega download link access)
 // ----------------------------------------------------------
 model BootcampAccess {
-  id            String   @id @default(uuid())
-  bootcampId    String
-  bootcamp      Bootcamp @relation(fields: [bootcampId], references: [id], onDelete: Cascade)
-  userId        String
-  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  grantedAt     DateTime @default(now())
+  id         String   @id @default(uuid())
+  bootcampId String
+  bootcamp   Bootcamp @relation(fields: [bootcampId], references: [id], onDelete: Cascade)
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  grantedAt  DateTime @default(now())
 
   @@unique([bootcampId, userId])
 }
@@ -817,75 +815,73 @@ model Form {
   createdAt             DateTime        @default(now())
   updatedAt             DateTime        @updatedAt
 
-  questions   FormQuestion[]
-  answers     FormAnswer[]
+  questions FormQuestion[]
+  answers   FormAnswer[]
 }
 
 model FormQuestion {
-  id          String            @id @default(cuid())
-  formId      String
-  form        Form              @relation(fields: [formId], references: [id], onDelete: Cascade)
+  id     String @id @default(cuid())
+  formId String
+  form   Form   @relation(fields: [formId], references: [id], onDelete: Cascade)
 
-  questionId  String?
-  question    Question?         @relation(fields: [questionId], references: [id])
+  questionId String?
+  question   Question? @relation(fields: [questionId], references: [id])
 
-  label       String
-  helpText    String?
-  inputType   QuestionInputType @default(TEXT)
-  options     String[]          @default([])
-  isRequired  Boolean           @default(true)
-  weight      Float?
-  order       Int               @default(0)
-  config      Json?
+  label      String
+  helpText   String?
+  inputType  QuestionInputType @default(TEXT)
+  options    String[]          @default([])
+  isRequired Boolean           @default(true)
+  weight     Float?
+  order      Int               @default(0)
+  config     Json?
 
-  createdAt   DateTime          @default(now())
+  createdAt DateTime @default(now())
 
-  answers     FormAnswerItem[]
+  answers FormAnswerItem[]
 
   @@unique([formId, order])
 }
 
 model FormAnswer {
-  id            String              @id @default(cuid())
-  formId        String
-  form          Form                @relation(fields: [formId], references: [id])
+  id     String @id @default(cuid())
+  formId String
+  form   Form   @relation(fields: [formId], references: [id])
 
   participantId String?
   participant   ParticipantProfile? @relation(fields: [participantId], references: [id])
 
-  guestEmail    String?
-  guestName     String?
+  guestEmail String?
+  guestName  String?
 
-  status        AnswerStatus @default(DRAFT)
-  totalScore    Float?
-  submittedAt   DateTime?
-  createdAt     DateTime     @default(now())
-  updatedAt     DateTime     @updatedAt
+  status      AnswerStatus @default(DRAFT)
+  totalScore  Float?
+  submittedAt DateTime?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
 
-  items         FormAnswerItem[]
+  items FormAnswerItem[]
 }
 
 model FormAnswerItem {
-  id             String       @id @default(cuid())
-  answerId       String
-  answer         FormAnswer   @relation(fields: [answerId], references: [id], onDelete: Cascade)
+  id       String     @id @default(cuid())
+  answerId String
+  answer   FormAnswer @relation(fields: [answerId], references: [id], onDelete: Cascade)
 
   formQuestionId String
   formQuestion   FormQuestion @relation(fields: [formQuestionId], references: [id])
 
-  value          Json
-  autoScore      Float?
+  value     Json
+  autoScore Float?
 
-  createdAt      DateTime     @default(now())
+  createdAt DateTime @default(now())
 }
-
 
 model LandingSetting {
   key       String   @id // e.g. "hero", "steps", "features"
-  data      Json     // ساختار JSON منعطف برای نگهداری تیترها، آیکون‌ها و کارت‌ها
+  data      Json // ساختار JSON منعطف برای نگهداری تیترها، آیکون‌ها و کارت‌ها
   updatedAt DateTime @updatedAt
 }
-
 
 // ----------------------------------------------------------
 // ARTIFACTS / AASAAR SYSTEM
@@ -906,43 +902,43 @@ enum ArtifactMediaType {
 }
 
 model Artifact {
-  id              String             @id @default(uuid())
-  participantId  String
-  participant    ParticipantProfile @relation(fields: [participantId], references: [id], onDelete: Cascade)
-  
-  axis            String             // e.g. "تخصص من", "حرفه من", "مهارت من", "امضای من", "آینه من", "حضور من"
-  templateTitle   String             // e.g. "پایان‌نامه در ۹۰ ثانیه", "پادکست یا خبرنامه تخصصی"
-  title           String
-  description     String?
-  mediaType       ArtifactMediaType
-  mediaUrl        String             // لینک فایل، مدیا یا آدرس وب
-  coverImageUrl   String?            // تصویر شاخص یا پیش‌نمایش
+  id            String             @id @default(uuid())
+  participantId String
+  participant   ParticipantProfile @relation(fields: [participantId], references: [id], onDelete: Cascade)
 
-  status          ArtifactStatus     @default(PENDING)
-  adminNote       String?            // دلیل رد یا نظر داور
+  axis          String // e.g. "تخصص من", "حرفه من", "مهارت من", "امضای من", "آینه من", "حضور من"
+  templateTitle String // e.g. "پایان‌نامه در ۹۰ ثانیه", "پادکست یا خبرنامه تخصصی"
+  title         String
+  description   String?
+  mediaType     ArtifactMediaType
+  mediaUrl      String // لینک فایل، مدیا یا آدرس وب
+  coverImageUrl String? // تصویر شاخص یا پیش‌نمایش
 
-  ratings         ArtifactRating[]
-  comments        ArtifactComment[]
+  status    ArtifactStatus @default(PENDING)
+  adminNote String? // دلیل رد یا نظر داور
 
-  averageRating   Float              @default(0)
-  ratingsCount    Int                @default(0)
+  ratings  ArtifactRating[]
+  comments ArtifactComment[]
 
-  createdAt       DateTime           @default(now())
-  updatedAt       DateTime           @updatedAt
+  averageRating Float @default(0)
+  ratingsCount  Int   @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([participantId, status])
   @@index([axis, status])
 }
 
 model ArtifactRating {
-  id          String    @id @default(uuid())
-  artifactId  String
-  artifact    Artifact  @relation(fields: [artifactId], references: [id], onDelete: Cascade)
-  userId      String
-  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  score       Int       // 1 to 5
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  id         String   @id @default(uuid())
+  artifactId String
+  artifact   Artifact @relation(fields: [artifactId], references: [id], onDelete: Cascade)
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  score      Int // 1 to 5
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
   @@unique([artifactId, userId])
   @@index([artifactId])
@@ -978,15 +974,15 @@ enum AnnouncementType {
 }
 
 model Announcement {
-  id        String             @id @default(uuid())
-  title     String
-  content   String             @db.Text
-  type      AnnouncementType   @default(INFO)
-  isGlobal  Boolean            @default(true) // آیا برای همه است یا کاربر خاص؟
-  targetUserId String?         // اگر خالی نباشد، فقط برای این کاربر خاص است
-  isSent    Boolean            @default(false) // آیا ایمیلش ارسال شده؟
-  createdAt DateTime           @default(now())
-  updatedAt DateTime           @updatedAt
+  id           String           @id @default(uuid())
+  title        String
+  content      String           @db.Text
+  type         AnnouncementType @default(INFO)
+  isGlobal     Boolean          @default(true) // آیا برای همه است یا کاربر خاص؟
+  targetUserId String? // اگر خالی نباشد، فقط برای این کاربر خاص است
+  isSent       Boolean          @default(false) // آیا ایمیلش ارسال شده؟
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
 
   @@index([targetUserId])
 }
@@ -1017,17 +1013,16 @@ model Ticket {
 }
 
 model TicketMessage {
-  id        String     @id @default(uuid())
-  ticketId  String
-  ticket    Ticket     @relation(fields: [ticketId], references: [id], onDelete: Cascade)
-  senderId  String     // شناسه کاربری که پیام را فرستاده (چه کاربر و چه ادمین)
+  id         String     @id @default(uuid())
+  ticketId   String
+  ticket     Ticket     @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  senderId   String // شناسه کاربری که پیام را فرستاده (چه کاربر و چه ادمین)
   senderRole SenderRole @default(USER)
-  message   String     @db.Text
-  createdAt DateTime   @default(now())
+  message    String     @db.Text
+  createdAt  DateTime   @default(now())
 
   @@index([ticketId])
 }
-
 
 enum SponsorPlacement {
   DASHBOARD
@@ -1041,19 +1036,19 @@ enum SponsorSlideType {
 }
 
 model Sponsor {
-  id              String           @id @default(cuid())
-  slug            String           @unique
-  name            String
-  tagline         String?
-  slideType       SponsorSlideType @default(IMAGE)
-  slideMediaUrl   String           // تصویر اسلاید یا لینک ویدیو
-  placement       SponsorPlacement @default(DASHBOARD)
-  order           Int              @default(0)
-  isActive        Boolean          @default(true)
+  id            String           @id @default(cuid())
+  slug          String           @unique
+  name          String
+  tagline       String?
+  slideType     SponsorSlideType @default(IMAGE)
+  slideMediaUrl String // تصویر اسلاید یا لینک ویدیو
+  placement     SponsorPlacement @default(DASHBOARD)
+  order         Int              @default(0)
+  isActive      Boolean          @default(true)
 
   // آمار بازدید و کلیک اسلایدر
-  viewCount       Int              @default(0)
-  clickCount      Int              @default(0)
+  viewCount  Int @default(0)
+  clickCount Int @default(0)
 
   // دکمه اقدام خارجی اختیاری
   externalLinkLabel String?
@@ -1061,40 +1056,39 @@ model Sponsor {
 
   // محتوای صفحه اختصاصی داخل سایت (/sponsors/:slug)
   coverImageUrl   String?
-  fullDescription String?          @db.Text
+  fullDescription String? @db.Text
   websiteUrl      String?
   instagramUrl    String?
   linkedinUrl     String?
   telegramUrl     String?
 
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([placement, isActive, order])
 }
 
-
 model BootcampRegistration {
-  id              String                     @id @default(uuid())
-  bootcampId      String
-  bootcamp        Bootcamp                   @relation(fields: [bootcampId], references: [id], onDelete: Cascade)
-  
-  fullName        String
-  mobile          String
-  email           String?
-  telegramId      String?                    // آیدی تلگرام
-  telegramPhone   String?                    // شماره تلگرام
-  notes           String?                    // توضیحات یا سوابق متقاضی
-  
-  status          BootcampRegistrationStatus @default(INITIAL)
-  trackingCode    String                     @unique @default(cuid())
-  finalMessage    String?                    // پیام اختصاصی یا متن نهایی ادمین
-  cardLastDigits  String?                    // ۴ رقم آخر کارت یا شماره پیگیری واریز
-  paidAt          DateTime?
-  finalizedAt     DateTime?
+  id         String   @id @default(uuid())
+  bootcampId String
+  bootcamp   Bootcamp @relation(fields: [bootcampId], references: [id], onDelete: Cascade)
 
-  createdAt       DateTime                   @default(now())
-  updatedAt       DateTime                   @updatedAt
+  fullName      String
+  mobile        String
+  email         String?
+  telegramId    String? // آیدی تلگرام
+  telegramPhone String? // شماره تلگرام
+  notes         String? // توضیحات یا سوابق متقاضی
+
+  status         BootcampRegistrationStatus @default(INITIAL)
+  trackingCode   String                     @unique @default(cuid())
+  finalMessage   String? // پیام اختصاصی یا متن نهایی ادمین
+  cardLastDigits String? // ۴ رقم آخر کارت یا شماره پیگیری واریز
+  paidAt         DateTime?
+  finalizedAt    DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([bootcampId])
   @@index([status])
@@ -1105,13 +1099,13 @@ model BootcampRegistration {
 // ----------------------------------------------------------
 
 model Guide {
-  id          String       @id @default(uuid())
-  pagePath    String       @unique // e.g. "/" or "/signup" or "/dashboard"
-  title       String?
-  isEnabled   Boolean      @default(true)
-  slides      GuideSlide[]
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
+  id        String       @id @default(uuid())
+  pagePath  String       @unique // e.g. "/" or "/signup" or "/dashboard"
+  title     String?
+  isEnabled Boolean      @default(true)
+  slides    GuideSlide[]
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
 }
 
 model GuideSlide {
@@ -1128,24 +1122,22 @@ model GuideSlide {
   @@index([guideId, order])
 }
 
-
 // ==========================================
 // DIRECT USER-TO-USER CHAT MODULE
 // ==========================================
 model DirectMessage {
-  id          String   @id @default(uuid())
-  senderId    String
-  sender      User     @relation("SentDirectMessages", fields: [senderId], references: [id], onDelete: Cascade)
-  receiverId  String
-  receiver    User     @relation("ReceivedDirectMessages", fields: [receiverId], references: [id], onDelete: Cascade)
-  content     String   @db.Text
-  isRead      Boolean  @default(false)
-  createdAt   DateTime @default(now())
+  id         String   @id @default(uuid())
+  senderId   String
+  sender     User     @relation("SentDirectMessages", fields: [senderId], references: [id], onDelete: Cascade)
+  receiverId String
+  receiver   User     @relation("ReceivedDirectMessages", fields: [receiverId], references: [id], onDelete: Cascade)
+  content    String   @db.Text
+  isRead     Boolean  @default(false)
+  createdAt  DateTime @default(now())
 
   @@index([senderId, receiverId])
   @@index([receiverId])
 }
-
 
 // ==========================================
 // BUSINESS SHOWCASE MODULE (ویترین کسب‌وکارها)
@@ -1167,38 +1159,38 @@ enum BusinessCategory {
 }
 
 model BusinessVideo {
-  id              String               @id @default(uuid())
-  userId          String
-  user            User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
-  businessName    String
-  ownerName       String
-  category        BusinessCategory     @default(OTHER)
-  
+  id     String @id @default(uuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  businessName String
+  ownerName    String
+  category     BusinessCategory @default(OTHER)
+
   videoUrl        String
   thumbnailUrl    String?
-  durationSeconds Int                  @default(0)
-  fileSizeBytes   Int                  @default(0)
-  
-  description     String?              @db.Text
-  websiteUrl      String?
-  instagramUrl    String?
-  telegramUrl     String?
-  phoneNumber     String?
-  
-  status          BusinessVideoStatus  @default(PENDING)
-  rejectionReason String?              @db.Text
-  
-  viewCount       Int                  @default(0)
-  likeCount       Int                  @default(0)
-  isFeatured      Boolean              @default(false)
-  order           Int                  @default(0)
-  
-  comments        BusinessVideoComment[]
-  likes           BusinessVideoLike[]
+  durationSeconds Int     @default(0)
+  fileSizeBytes   Int     @default(0)
 
-  createdAt       DateTime             @default(now())
-  updatedAt       DateTime             @updatedAt
+  description  String? @db.Text
+  websiteUrl   String?
+  instagramUrl String?
+  telegramUrl  String?
+  phoneNumber  String?
+
+  status          BusinessVideoStatus @default(PENDING)
+  rejectionReason String?             @db.Text
+
+  viewCount  Int     @default(0)
+  likeCount  Int     @default(0)
+  isFeatured Boolean @default(false)
+  order      Int     @default(0)
+
+  comments BusinessVideoComment[]
+  likes    BusinessVideoLike[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([status, category])
   @@index([userId])
@@ -1206,32 +1198,182 @@ model BusinessVideo {
 }
 
 model BusinessVideoComment {
-  id              String                @id @default(uuid())
-  videoId         String
-  video           BusinessVideo         @relation(fields: [videoId], references: [id], onDelete: Cascade)
-  userId          String
-  user            User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
-  content         String                @db.Text
-  parentId        String?
-  parent          BusinessVideoComment? @relation("BusinessCommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
-  replies         BusinessVideoComment[] @relation("BusinessCommentReplies")
-  
-  isApproved      Boolean               @default(true)
-  createdAt       DateTime              @default(now())
-  updatedAt       DateTime              @updatedAt
+  id       String                 @id @default(uuid())
+  videoId  String
+  video    BusinessVideo          @relation(fields: [videoId], references: [id], onDelete: Cascade)
+  userId   String
+  user     User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  content  String                 @db.Text
+  parentId String?
+  parent   BusinessVideoComment?  @relation("BusinessCommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies  BusinessVideoComment[] @relation("BusinessCommentReplies")
+
+  isApproved Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
   @@index([videoId])
   @@index([userId])
 }
 
 model BusinessVideoLike {
-  id              String         @id @default(uuid())
-  videoId         String
-  video           BusinessVideo  @relation(fields: [videoId], references: [id], onDelete: Cascade)
-  userId          String
-  user            User           @relation(fields: [userId], references: [id], onDelete: Cascade)
-  createdAt       DateTime       @default(now())
+  id        String        @id @default(uuid())
+  videoId   String
+  video     BusinessVideo @relation(fields: [videoId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime      @default(now())
 
   @@unique([videoId, userId])
   @@index([videoId])
+}
+
+model EmailTemplate {
+  id        String   @id @default(uuid())
+  key       String   @unique // ANNOUNCEMENT, CHAT_DIGEST, NEW_FEEDBACK
+  title     String // عنوان بخش در پنل ادمین
+  subject   String // موضوع ایمیل
+  body      String   @db.Text // متن با تگ‌ها
+  isActive  Boolean  @default(true)
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+}
+
+enum BlogPostStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+model BlogPost {
+  id          String         @id @default(uuid())
+  title       String
+  slug        String         @unique
+  summary     String?
+  content     String         @db.Text
+  coverImage  String?
+  category    String         @default("عمومی")
+  tags        String[]       @default([])
+  readingTime Int            @default(3)
+  views       Int            @default(0)
+  status      BlogPostStatus @default(DRAFT)
+  publishedAt DateTime?
+  authorId    String
+  author      User           @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  @@index([status, publishedAt])
+  @@index([slug])
+  @@index([category])
+}
+
+// ==========================================
+// WORKSHOP 360 DEGREE EVALUATION SYSTEM (ISOLATED)
+// ==========================================
+
+enum Workshop360Role {
+  CONTENT_EVALUATOR
+  STUDENT
+  INSTRUCTOR
+  OPS_EVALUATOR
+  OPS_STAFF
+}
+
+enum Workshop360SessionStatus {
+  DRAFT
+  IN_PROGRESS
+  COMPLETED
+  ARCHIVED
+}
+
+model Workshop360Session {
+  id          String                   @id @default(uuid())
+  title       String
+  description String?
+  bootcampId  String?
+  status      Workshop360SessionStatus @default(DRAFT)
+
+  // تنظیمات فعال/غیرفعال بودن لایو بخش‌ها توسط ارزیاب
+  // به عنوان مثال: { "section1": true, "section2": false }
+  activeSections Json @default("{}")
+
+  // ساختار قالب سوالات و بخش‌ها
+  template Json @default("[]")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  attendees         Workshop360Attendee[]
+  submissions       Workshop360Submission[]
+  Workshop360Matrix Workshop360Matrix[]
+
+  @@index([bootcampId])
+  @@index([status])
+}
+
+model Workshop360Attendee {
+  id        String             @id @default(uuid())
+  sessionId String
+  session   Workshop360Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  userId    String?
+  fullName  String
+  mobile    String?
+  role      Workshop360Role @default(STUDENT)
+  isPresent Boolean         @default(false)
+  notes     String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  givenEvaluations    Workshop360Submission[] @relation("EvaluatorSubmissions")
+  receivedEvaluations Workshop360Submission[] @relation("TargetSubmissions")
+
+  @@unique([sessionId, fullName])
+  @@index([sessionId])
+  @@index([userId])
+  @@index([role])
+}
+
+model Workshop360Submission {
+  id        String             @id @default(uuid())
+  sessionId String
+  session   Workshop360Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  sectionKey String // کلید بخش فرم (مثلا student_self_eval یا evaluator_content)
+
+  evaluatorId String? // شناسه رکورد ارزیابی‌کننده در جدول Workshop360Attendee
+  evaluator   Workshop360Attendee? @relation("EvaluatorSubmissions", fields: [evaluatorId], references: [id], onDelete: Cascade)
+
+  targetAttendeeId String? // شناسه ارزیابی‌شونده در جدول Workshop360Attendee
+  targetAttendee   Workshop360Attendee? @relation("TargetSubmissions", fields: [targetAttendeeId], references: [id], onDelete: Cascade)
+
+  answers         Json // مقادیر تمام فیلدها: { questionId: value }
+  calculatedScore Float? // نمره نهایی محاسبه شده
+  feedback        String? // نظر متنی یا جمع‌بندی نهایی
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([sessionId, sectionKey])
+  @@index([targetAttendeeId])
+  @@index([evaluatorId])
+}
+
+model Workshop360Matrix {
+  id        String                  @id @default(uuid())
+  title     String
+  workshop  Workshop360Session      @relation(fields: [sessionId], references: [id])
+  sessionId String
+  items     Workshop360MatrixItem[]
+}
+
+model Workshop360MatrixItem {
+  id       String            @id @default(uuid())
+  matrixId String
+  matrix   Workshop360Matrix @relation(fields: [matrixId], references: [id])
+  title    String
+  weight   Float             @default(1.0) // برای محاسبات میانگین وزن‌دار
+  parentId String? // برای زیر-آیتم‌ها
 }

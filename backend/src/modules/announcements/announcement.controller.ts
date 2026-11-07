@@ -1,3 +1,4 @@
+import { notifyNewAnnouncement } from '../email-templates/email-template.service';
 import { Request, Response } from "express";
 import { AnnouncementService } from "./announcement.service";
 import { AnnouncementType } from "@prisma/client";
@@ -30,6 +31,7 @@ export class AnnouncementController {
         type: type as AnnouncementType,
       });
 
+      notifyNewAnnouncement(announcement);
       return res.json(announcement);
     } catch (error: any) {
       return res.status(500).json({ message: error.message || "Internal server error" });
