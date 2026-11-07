@@ -11,3 +11,7 @@ docker-data/
 
 # Never commit user-uploaded files
 /backend/uploads/
+*.bak*
+backend/src/**/*.bak*
+frontend/src/**/*.bak*
+node_modules/
